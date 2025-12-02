@@ -20,6 +20,7 @@ interface CartScreenProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
   onCheckout?: () => void;
+  zIndex?: number;
 }
 
 export default function CartScreen({
@@ -33,6 +34,7 @@ export default function CartScreen({
   searchQuery,
   onSearchChange,
   onCheckout,
+  zIndex = 1000,
 }: CartScreenProps) {
   const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const opacity = useRef(new Animated.Value(0)).current;
@@ -207,7 +209,7 @@ export default function CartScreen({
   }, [cart, favorites, onToggleFavorite, onUpdateQuantity]);
 
   return (
-    <View style={styles.overlayContainer}>
+    <View style={[styles.overlayContainer, { zIndex }]}>
       <TouchableOpacity 
         activeOpacity={1}
         onPress={closeOverlay}
@@ -427,7 +429,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    zIndex: 1000,
   },
   backdropTouchable: {
     position: 'absolute',
@@ -552,8 +553,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   commentContainer: {
-    marginTop: 8,
+    marginTop: -4,
     padding: 12,
+    paddingTop: 8,
     backgroundColor: '#f9f9f9',
     borderRadius: 8,
     borderLeftWidth: 3,

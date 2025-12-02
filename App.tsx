@@ -25,6 +25,7 @@ export default function App() {
   const [showFavorites, setShowFavorites] = useState(false);
   const [showCart, setShowCart] = useState(false);
   const [showShoppingList, setShowShoppingList] = useState(false);
+  const [showShoppingListProductView, setShowShoppingListProductView] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [shouldFocusSearch, setShouldFocusSearch] = useState(false);
@@ -97,6 +98,7 @@ export default function App() {
     setShowFavorites(false);
     setShowCart(false);
     setShowShoppingList(false);
+    setShowShoppingListProductView(false);
     setShowCheckout(false);
     setShowChat(false);
     setShouldFocusSearch(false);
@@ -143,8 +145,22 @@ export default function App() {
           const { [id]: __, ...restComments } = prevComments;
           return restComments;
         });
+        // Synchronisiere mit Einkaufsliste: Wenn Produkt in Einkaufsliste ist, setze Menge auf 0
+        setShoppingList(prevShoppingList => {
+          if (prevShoppingList[id] !== undefined) {
+            return { ...prevShoppingList, [id]: 0 };
+          }
+          return prevShoppingList;
+        });
         return rest;
       }
+      // Synchronisiere mit Einkaufsliste: Wenn Produkt in Einkaufsliste ist, aktualisiere Menge
+      setShoppingList(prevShoppingList => {
+        if (prevShoppingList[id] !== undefined) {
+          return { ...prevShoppingList, [id]: newQty };
+        }
+        return prevShoppingList;
+      });
       return { ...prev, [id]: newQty };
     });
   };
@@ -161,16 +177,40 @@ export default function App() {
 
   const updateShoppingListQuantity = (id: string, change: number) => {
     setShoppingList(prev => {
+      // Wenn change === 0, bedeutet das "hinzufügen zur Einkaufsliste"
+      if (change === 0) {
+        // Prüfe die zentral verwaltete Menge (Warenkorb)
+        const cartQty = cart[id] || 0;
+        // Setze die Einkaufsliste-Menge immer auf die Warenkorb-Menge (zentral verwaltet)
+        // Wenn Produkt nicht im Warenkorb ist, bleibt es bei 0
+        return { ...prev, [id]: cartQty };
+      }
+      
+      // Normale Logik für Änderungen
       const currentQty = prev[id] || 0;
       const newQty = Math.max(0, currentQty + change);
-      if (newQty === 0) {
-        const { [id]: _, ...rest } = prev;
-        setShoppingListComments(prevComments => {
-          const { [id]: __, ...restComments } = prevComments;
-          return restComments;
-        });
-        return rest;
-      }
+      // WICHTIG: Bei Menge 0 NICHT löschen - nur durch Mülleimer wird gelöscht
+      // Das Löschen wird durch onDelete (Mülleimer) gehandhabt
+      
+      // Synchronisiere mit Warenkorb: Aktualisiere Warenkorb-Menge entsprechend
+      setCart(prevCart => {
+        const cartQty = prevCart[id] || 0;
+        // Berechne die Differenz zwischen alter und neuer Einkaufsliste-Menge
+        const diff = newQty - currentQty;
+        const newCartQty = Math.max(0, cartQty + diff);
+        
+        if (newCartQty === 0) {
+          const { [id]: _, ...rest } = prevCart;
+          // Entferne auch den Kommentar, wenn der Artikel entfernt wird
+          setCartComments(prevComments => {
+            const { [id]: __, ...restComments } = prevComments;
+            return restComments;
+          });
+          return rest;
+        }
+        return { ...prevCart, [id]: newCartQty };
+      });
+      
       return { ...prev, [id]: newQty };
     });
   };
@@ -182,6 +222,17 @@ export default function App() {
         return rest;
       }
       return { ...prev, [id]: comment };
+    });
+  };
+
+  const removeFromShoppingList = (id: string) => {
+    setShoppingList(prev => {
+      const { [id]: _, ...rest } = prev;
+      return rest;
+    });
+    setShoppingListComments(prev => {
+      const { [id]: _, ...rest } = prev;
+      return rest;
     });
   };
 
@@ -267,6 +318,7 @@ export default function App() {
           onCheckout={() => {
             setShowCheckout(true);
           }}
+          zIndex={showShoppingList ? 1100 : 1000}
         />
       )}
       {/* CheckoutScreen als Overlay über CartScreen */}
@@ -283,7 +335,7 @@ export default function App() {
         />
       )}
       {/* ProductListScreen als Overlay über HomeScreen */}
-      {selectedCategory && (
+      {selectedCategory && !showShoppingListProductView && (
         <ProductListScreen
           category={selectedCategory}
           products={products}
@@ -322,13 +374,53 @@ export default function App() {
           shoppingList={shoppingList}
           shoppingListComments={shoppingListComments}
           onUpdateQuantity={updateShoppingListQuantity}
+          onRemoveFromShoppingList={removeFromShoppingList}
           onUpdateComment={updateShoppingListComment}
           onBack={() => setShowShoppingList(false)}
           favorites={favorites}
           onToggleFavorite={toggleFavorite}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
-          onAddToCart={addShoppingListToCart}
+          cart={cart}
+          onHeaderCartPress={() => {
+            setShowCart(true);
+          }}
+          onUpdateCartQuantity={updateQuantity}
+          onAddProduct={() => {
+            setShowShoppingListProductView(true);
+            setSelectedCategory(null);
+            setProducts([]);
+            const allCategory = categories.find(cat => cat.id === 'all');
+            if (allCategory) {
+              loadCategoryData(allCategory);
+            }
+          }}
+        />
+      )}
+      {/* ProductListScreen für Einkaufsliste */}
+      {showShoppingListProductView && (
+        <ProductListScreen
+          category={selectedCategory || categories.find(cat => cat.id === 'all')!}
+          products={products}
+          loading={loading}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          onBack={() => {
+            setShowShoppingListProductView(false);
+            setSelectedCategory(null);
+            setProducts([]);
+          }}
+          favorites={favorites}
+          favoritesOrder={favoritesOrder}
+          cart={cart}
+          shoppingList={shoppingList}
+          onToggleFavorite={toggleFavorite}
+          onUpdateQuantity={updateQuantity}
+          onUpdateShoppingListQuantity={updateShoppingListQuantity}
+          shouldFocusSearch={false}
+          initialFilter={null}
+          shoppingListMode={true}
+          zIndex={1001}
         />
       )}
     </>

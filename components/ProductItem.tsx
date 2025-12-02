@@ -14,6 +14,9 @@ interface ProductItemProps {
   showCommentButton?: boolean;
   onCommentPress?: (id: string) => void;
   hasComment?: boolean;
+  showAddToShoppingList?: boolean;
+  onAddToShoppingList?: (id: string) => void;
+  isInShoppingList?: boolean;
 }
 
 export default function ProductItem({
@@ -27,6 +30,9 @@ export default function ProductItem({
   showCommentButton = false,
   onCommentPress,
   hasComment = false,
+  showAddToShoppingList = false,
+  onAddToShoppingList,
+  isInShoppingList = false,
 }: ProductItemProps) {
   const id = item.data_id || item.Artikelname;
 
@@ -164,6 +170,18 @@ export default function ProductItem({
                   color="#FF3B30" 
                 />
               </TouchableOpacity>
+            ) : showAddToShoppingList && onAddToShoppingList ? (
+              <TouchableOpacity 
+                onPress={() => onAddToShoppingList(id)}
+                style={styles.favoriteButton}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons 
+                  name={isInShoppingList ? "checkmark-circle" : "add-circle-outline"} 
+                  size={24} 
+                  color={isInShoppingList ? "#2E2C55" : "#2E2C55"} 
+                />
+              </TouchableOpacity>
             ) : (
               !showCommentButton && (
                 <TouchableOpacity 
@@ -186,36 +204,38 @@ export default function ProductItem({
             {item.unit_title || item.unit_value || 'Flasche'}
             {item.volume_liters && ` • ${item.volume_liters}l`}
           </Text>
-          {totalBottlesText ? (
+          {!showAddToShoppingList && totalBottlesText ? (
             <Text style={styles.totalBottlesText}>{totalBottlesText}</Text>
           ) : null}
         </View>
-        <View style={styles.cartControls}>
-          <View style={styles.quantityControls}>
-            <TouchableOpacity 
-              style={styles.quantityButton}
-              onPress={() => onUpdateQuantity(id, -1)}
-              disabled={quantity === 0}
-            >
-              <Ionicons 
-                name="remove" 
-                size={18} 
-                color={quantity === 0 ? "#ccc" : "#2E2C55"} 
-              />
-            </TouchableOpacity>
-            <Text style={styles.quantityText}>{quantity}</Text>
-            <TouchableOpacity 
-              style={styles.quantityButton}
-              onPress={() => onUpdateQuantity(id, 1)}
-            >
-              <Ionicons 
-                name="add" 
-                size={18} 
-                color="#2E2C55" 
-              />
-            </TouchableOpacity>
+        {!showAddToShoppingList && (
+          <View style={styles.cartControls}>
+            <View style={styles.quantityControls}>
+              <TouchableOpacity 
+                style={styles.quantityButton}
+                onPress={() => onUpdateQuantity(id, -1)}
+                disabled={quantity === 0}
+              >
+                <Ionicons 
+                  name="remove" 
+                  size={18} 
+                  color={quantity === 0 ? "#ccc" : "#2E2C55"} 
+                />
+              </TouchableOpacity>
+              <Text style={styles.quantityText}>{quantity}</Text>
+              <TouchableOpacity 
+                style={styles.quantityButton}
+                onPress={() => onUpdateQuantity(id, 1)}
+              >
+                <Ionicons 
+                  name="add" 
+                  size={18} 
+                  color="#2E2C55" 
+                />
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
+        )}
       </View>
     </View>
   );

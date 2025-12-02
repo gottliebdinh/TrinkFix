@@ -27,6 +27,8 @@ interface ProductListScreenProps {
   onHeaderCartPress?: () => void;
   shouldFocusSearch?: boolean;
   initialFilter?: string | null;
+  shoppingListMode?: boolean;
+  zIndex?: number;
 }
 
 export default function ProductListScreen({
@@ -46,6 +48,8 @@ export default function ProductListScreen({
   onHeaderCartPress,
   shouldFocusSearch = false,
   initialFilter = null,
+  shoppingListMode = false,
+  zIndex = 1000,
 }: ProductListScreenProps) {
   const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const opacity = useRef(new Animated.Value(0)).current;
@@ -154,8 +158,11 @@ export default function ProductListScreen({
   ).current;
   const renderProductItem = useCallback(({ item }: { item: Product }) => {
     const id = item.data_id || item.Artikelname;
-    const quantity = cart[id] || 0;
+    // Im shoppingListMode keine Menge anzeigen, sonst aus cart
+    const quantity = shoppingListMode ? 0 : (cart[id] || 0);
     const isFavorite = favorites.has(id);
+    // Prüfe ob das Produkt in der Einkaufsliste ist (auch mit Menge 0)
+    const isInShoppingList = shoppingList ? (shoppingList[id] !== undefined) : false;
 
     return (
       <ProductItem
@@ -164,9 +171,12 @@ export default function ProductListScreen({
         isFavorite={isFavorite}
         onToggleFavorite={onToggleFavorite}
         onUpdateQuantity={onUpdateQuantity}
+        showAddToShoppingList={shoppingListMode}
+        onAddToShoppingList={onUpdateShoppingListQuantity ? (itemId) => onUpdateShoppingListQuantity(itemId, 0) : undefined}
+        isInShoppingList={isInShoppingList}
       />
     );
-  }, [cart, favorites, onToggleFavorite, onUpdateQuantity]);
+  }, [cart, shoppingList, shoppingListMode, favorites, onToggleFavorite, onUpdateQuantity, onUpdateShoppingListQuantity]);
 
   // Filtere Produkte nach Kategorie
   const categoryFilteredProducts = useMemo(() => {
@@ -296,7 +306,7 @@ export default function ProductListScreen({
   };
 
   return (
-    <View style={styles.overlayContainer}>
+    <View style={[styles.overlayContainer, { zIndex }]}>
       <TouchableOpacity 
         activeOpacity={1}
         onPress={closeOverlay}

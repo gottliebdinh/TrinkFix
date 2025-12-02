@@ -16,6 +16,7 @@ export default function App() {
   const [cart, setCart] = useState<{[key: string]: number}>({});
   const [showFavorites, setShowFavorites] = useState(false);
   const [shouldFocusSearch, setShouldFocusSearch] = useState(false);
+  const [initialFilter, setInitialFilter] = useState<string | null>(null);
 
   // Berechne Gesamtanzahl aller Artikel mit useMemo
   const totalProducts = useMemo(() => {
@@ -64,7 +65,17 @@ export default function App() {
 
   const handleCategoryPress = (category: Category) => {
     setShouldFocusSearch(false); // Kein Auto-Focus bei Kategorieklick
-    loadCategoryData(category);
+    // Setze die Kategorie als initialen Filter, wenn es nicht "Alle Artikel" ist
+    if (category.id !== 'all') {
+      setInitialFilter(category.id);
+    } else {
+      setInitialFilter(null);
+    }
+    // Öffne immer "Alle Artikel" mit dem entsprechenden Filter
+    const allCategory = categories.find(cat => cat.id === 'all');
+    if (allCategory) {
+      loadCategoryData(allCategory);
+    }
   };
 
   const handleBackPress = () => {
@@ -73,6 +84,7 @@ export default function App() {
     setSearchQuery('');
     setShowFavorites(false);
     setShouldFocusSearch(false);
+    setInitialFilter(null);
   };
 
   const handleSearchFocus = () => {
@@ -167,6 +179,7 @@ export default function App() {
             console.log('Warenkorb öffnen');
           }}
           shouldFocusSearch={shouldFocusSearch}
+          initialFilter={initialFilter}
         />
       )}
     </>

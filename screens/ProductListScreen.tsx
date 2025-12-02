@@ -23,6 +23,7 @@ interface ProductListScreenProps {
   onUpdateQuantity: (id: string, change: number) => void;
   onHeaderCartPress?: () => void;
   shouldFocusSearch?: boolean;
+  initialFilter?: string | null;
 }
 
 export default function ProductListScreen({
@@ -38,10 +39,17 @@ export default function ProductListScreen({
   onUpdateQuantity,
   onHeaderCartPress,
   shouldFocusSearch = false,
+  initialFilter = null,
 }: ProductListScreenProps) {
   const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const opacity = useRef(new Animated.Value(0)).current;
-  const [selectedFilters, setSelectedFilters] = useState<Set<string>>(new Set());
+  const [selectedFilters, setSelectedFilters] = useState<Set<string>>(() => {
+    // Initialisiere mit initialFilter, falls vorhanden
+    if (initialFilter) {
+      return new Set([initialFilter]);
+    }
+    return new Set();
+  });
   const [showFilterModal, setShowFilterModal] = useState(false);
   
   // Filtere "Alle Artikel" aus der Filterliste
@@ -498,8 +506,8 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: '#fff',
     paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 16,
+    paddingTop: 12,
+    paddingBottom: 0,
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
     shadowColor: '#000',
@@ -575,8 +583,8 @@ const styles = StyleSheet.create({
   filterContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 12,
-    paddingBottom: 8,
+    paddingTop: 8,
+    paddingBottom: 6,
     gap: 12,
   },
   filterIconButton: {

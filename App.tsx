@@ -332,6 +332,7 @@ export default function App() {
           onBack={() => {
             setShowCheckout(false);
           }}
+          zIndex={showShoppingList ? 1200 : 1001}
         />
       )}
       {/* ProductListScreen als Overlay über HomeScreen */}

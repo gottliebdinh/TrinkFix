@@ -113,11 +113,6 @@ export default function HomeScreen({
             <Ionicons name="bag" size={28} color="#2E2C55" />
           </View>
           <Text style={styles.quickAccessLabel}>Einkaufsliste</Text>
-          {shoppingListCount > 0 && (
-            <View style={styles.quickAccessBadge}>
-              <Text style={styles.quickAccessBadgeText}>{shoppingListCount}</Text>
-            </View>
-          )}
         </TouchableOpacity>
       </View>
       <Text style={styles.sectionTitle}>Artikel</Text>

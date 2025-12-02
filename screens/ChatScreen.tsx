@@ -9,9 +9,7 @@ interface ChatScreenProps {
   onBack: () => void;
 }
 
-const MESSAGE_TEXT = `Trinkkartell
-
-Liebe Kundinnen und Kunden,
+const MESSAGE_TEXT = `Liebe Kundinnen und Kunden,
 
 wir haben unsere Liefertage neu aufgeteilt, um unsere Touren effizienter zu gestalten und euch noch besser und planbarer beliefern zu können. 🚛✨
 
@@ -186,6 +184,7 @@ export default function ChatScreen({
           >
             {/* Nachricht von Trinkkartell */}
             <View style={styles.messageContainer}>
+              <Text style={styles.senderName}>Trinkkartell</Text>
               <View style={styles.messageBubble}>
                 <Text style={styles.messageText}>{MESSAGE_TEXT}</Text>
               </View>
@@ -276,6 +275,13 @@ const styles = StyleSheet.create({
   messageContainer: {
     marginBottom: 20,
     alignItems: 'flex-start',
+  },
+  senderName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#2E2C55',
+    marginBottom: 4,
+    marginLeft: 4,
   },
   messageBubble: {
     backgroundColor: '#fff',

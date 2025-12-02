@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useRef, useEffect, useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, TextInput, FlatList, Animated, PanResponder, Dimensions, Keyboard, Modal, ScrollView } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, TextInput, FlatList, Animated, PanResponder, Dimensions, Keyboard, Modal, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { Product } from '../types';
@@ -449,7 +449,10 @@ export default function ShoppingListScreen({
         animationType="fade"
         onRequestClose={() => setCommentModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
           <TouchableOpacity 
             style={styles.modalBackdrop}
             activeOpacity={1}
@@ -510,7 +513,7 @@ export default function ShoppingListScreen({
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
       
       {/* Filter Modal */}
@@ -808,8 +811,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   commentContainer: {
-    marginTop: 8,
+    marginTop: -4,
     padding: 12,
+    paddingTop: 8,
     backgroundColor: '#f9f9f9',
     borderRadius: 8,
     borderLeftWidth: 3,

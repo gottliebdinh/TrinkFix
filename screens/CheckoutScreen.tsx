@@ -16,6 +16,7 @@ interface CheckoutScreenProps {
   onToggleFavorite: (id: string) => void;
   onUpdateQuantity: (id: string, change: number) => void;
   onBack: () => void;
+  zIndex?: number;
 }
 
 export default function CheckoutScreen({
@@ -25,6 +26,7 @@ export default function CheckoutScreen({
   onToggleFavorite,
   onUpdateQuantity,
   onBack,
+  zIndex = 1001,
 }: CheckoutScreenProps) {
   const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const opacity = useRef(new Animated.Value(0)).current;
@@ -165,7 +167,7 @@ export default function CheckoutScreen({
   };
 
   return (
-    <View style={styles.overlayContainer}>
+    <View style={[styles.overlayContainer, { zIndex }]}>
       <TouchableOpacity 
         activeOpacity={1}
         onPress={closeOverlay}
@@ -414,7 +416,6 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'flex-end',
     backgroundColor: 'transparent',
-    zIndex: 1001,
   },
   backdropTouchable: {
     ...StyleSheet.absoluteFillObject,

@@ -1,0 +1,32 @@
+[
+  {
+    "Artikelname": "Limetten 1 kg",
+    "BildURL": "https://cdn.orderlion.com/itemimages/_supplier_7JWbbFcM6nq2am6mM/_250117-1352_XR8w79h6DRNDDxnyk-small.jpeg",
+    "data_id": "aHB7aAXcuKaSHXZtR",
+    "data_productid": "aHB7aAXcuKaSHXZtR",
+    "data_index": "2580",
+    "title_attribute": "Limetten 1 kg",
+    "ref": "96002",
+    "unit_title": "Sack",
+    "unit_value": "sack",
+    "unit_label": "Sack",
+    "tags": "Vorbesteller | Vorbesteller",
+    "volume_raw": "",
+    "volume_liters": ""
+  },
+  {
+    "Artikelname": "Zitronen 1,5 kg",
+    "BildURL": "https://cdn.orderlion.com/itemimages/_supplier_7JWbbFcM6nq2am6mM/_250117-1347_FYDAFdDz2q72g5zpg-small.jpeg",
+    "data_id": "Z8qwzq5ePBpKLt4iw",
+    "data_productid": "Z8qwzq5ePBpKLt4iw",
+    "data_index": "5123",
+    "title_attribute": "Zitronen 1,5 kg",
+    "ref": "96001",
+    "unit_title": "Sack",
+    "unit_value": "sack",
+    "unit_label": "Sack",
+    "tags": "Vorbesteller | Vorbesteller",
+    "volume_raw": "",
+    "volume_liters": ""
+  }
+]

@@ -1,10 +1,25 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, TextInput, ScrollView, Modal } from 'react-native';
+import React, { useState, useMemo } from 'react';
+import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, TextInput, ScrollView, Modal, FlatList } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import ordersData from '../data/Bestellungen/orders.json';
+
+interface Order {
+  id: string;
+  customer: string;
+  orderDate: string;
+  orderDateRaw: string;
+  orderTime: string;
+  orderNumber: string;
+  deliveryDate: string;
+  itemCount: string;
+  internalTags: string;
+  cancelled?: boolean;
+}
 
 interface OrdersScreenProps {
   onBack: () => void;
+  onOrderPress?: (order: Order) => void;
 }
 
 const ORDER_DATES = ['letzte 2h', 'letzte 7 tage', 'letzte 4 wochen', 'diesen monat', 'letzten 6 monat', 'letztes jahr'];
@@ -16,6 +31,7 @@ const GROUPS = ['würzburg', 'mach1 gruppe', 'italiener', 'montag', 'dienstag'];
 
 export default function OrdersScreen({
   onBack,
+  onOrderPress,
 }: OrdersScreenProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -43,6 +59,204 @@ export default function OrdersScreen({
       newSet.add(value);
     }
     setFilterSet(newSet);
+  };
+
+  // Parse Datum aus deutschem Format (z.B. "Di., 02.12.25")
+  const parseGermanDate = (dateStr: string): Date | null => {
+    if (!dateStr) return null;
+    
+    try {
+      // Entferne Wochentag und extrahiere Datum (z.B. "02.12.25")
+      const dateMatch = dateStr.match(/(\d{2})\.(\d{2})\.(\d{2})/);
+      if (!dateMatch) return null;
+      
+      const day = parseInt(dateMatch[1], 10);
+      const month = parseInt(dateMatch[2], 10) - 1; // Monate sind 0-indexiert
+      const year = 2000 + parseInt(dateMatch[3], 10);
+      
+      return new Date(year, month, day);
+    } catch {
+      return null;
+    }
+  };
+
+  // Prüfe ob Datum in Zeitraum liegt
+  const isDateInRange = (date: Date | null, start: Date | null, end: Date | null): boolean => {
+    if (!date) return false;
+    if (start && end) {
+      return date >= start && date <= end;
+    }
+    if (start) {
+      return date >= start;
+    }
+    if (end) {
+      return date <= end;
+    }
+    return false;
+  };
+
+  // Berechne Datum basierend auf Filteroption
+  const getDateFromFilter = (filter: string, isOrderDate: boolean): { start: Date | null, end: Date | null } => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    switch (filter) {
+      case 'letzte 2h':
+        const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+        return { start: twoHoursAgo, end: now };
+      case 'letzte 7 tage':
+        const sevenDaysAgo = new Date(today);
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        return { start: sevenDaysAgo, end: today };
+      case 'letzte 4 wochen':
+        const fourWeeksAgo = new Date(today);
+        fourWeeksAgo.setDate(fourWeeksAgo.getDate() - 28);
+        return { start: fourWeeksAgo, end: today };
+      case 'diesen monat':
+        const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+        return { start: monthStart, end: today };
+      case 'letzten 6 monat':
+        const sixMonthsAgo = new Date(today);
+        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+        return { start: sixMonthsAgo, end: today };
+      case 'letztes jahr':
+        const oneYearAgo = new Date(today);
+        oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+        return { start: oneYearAgo, end: today };
+      case 'nächsten 7 tage':
+        const sevenDaysLater = new Date(today);
+        sevenDaysLater.setDate(sevenDaysLater.getDate() + 7);
+        return { start: today, end: sevenDaysLater };
+      case 'morgen':
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        return { start: tomorrow, end: tomorrow };
+      case 'übermorgen':
+        const dayAfterTomorrow = new Date(today);
+        dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
+        return { start: dayAfterTomorrow, end: dayAfterTomorrow };
+      case 'heute':
+        return { start: today, end: today };
+      case 'letzten 7 tage':
+        const lastSevenDays = new Date(today);
+        lastSevenDays.setDate(lastSevenDays.getDate() - 7);
+        return { start: lastSevenDays, end: today };
+      case 'diesen monat':
+        const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+        return { start: thisMonthStart, end: today };
+      case 'letzten 6 monate':
+        const lastSixMonths = new Date(today);
+        lastSixMonths.setMonth(lastSixMonths.getMonth() - 6);
+        return { start: lastSixMonths, end: today };
+      case 'letztes jahr':
+        const lastYear = new Date(today);
+        lastYear.setFullYear(lastYear.getFullYear() - 1);
+        return { start: lastYear, end: today };
+      default:
+        return { start: null, end: null };
+    }
+  };
+
+  // Filtere Bestellungen basierend auf Suchanfrage und Filtern
+  const filteredOrders = useMemo(() => {
+    const orders = ordersData as Order[];
+    let filtered = orders;
+
+    // Suche
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(order => 
+        order.customer.toLowerCase().includes(query) ||
+        order.orderNumber.toLowerCase().includes(query)
+      );
+    }
+
+    // Filter: Storniert
+    if (selectedCancellation) {
+      if (selectedCancellation === 'storniert') {
+        filtered = filtered.filter(order => 
+          order.cancelled || order.internalTags?.toLowerCase().includes('storno')
+        );
+      } else if (selectedCancellation === 'nicht storniert') {
+        filtered = filtered.filter(order => 
+          !order.cancelled && !order.internalTags?.toLowerCase().includes('storno')
+        );
+      }
+    }
+
+    // Filter: Bestelldatum
+    if (selectedOrderDate || orderDateStart || orderDateEnd) {
+      if (orderDateStart || orderDateEnd) {
+        // Benutzerdefinierte Termine
+        filtered = filtered.filter(order => {
+          const orderDate = parseGermanDate(order.orderDateRaw);
+          return isDateInRange(orderDate, orderDateStart, orderDateEnd);
+        });
+      } else if (selectedOrderDate) {
+        // Vordefinierte Filter
+        const { start, end } = getDateFromFilter(selectedOrderDate, true);
+        filtered = filtered.filter(order => {
+          const orderDate = parseGermanDate(order.orderDateRaw);
+          return isDateInRange(orderDate, start, end);
+        });
+      }
+    }
+
+    // Filter: Lieferdatum
+    if (selectedDeliveryDate || deliveryDateStart || deliveryDateEnd) {
+      if (deliveryDateStart || deliveryDateEnd) {
+        // Benutzerdefinierte Termine
+        filtered = filtered.filter(order => {
+          const deliveryDate = parseGermanDate(order.deliveryDate);
+          return isDateInRange(deliveryDate, deliveryDateStart, deliveryDateEnd);
+        });
+      } else if (selectedDeliveryDate) {
+        // Vordefinierte Filter
+        const { start, end } = getDateFromFilter(selectedDeliveryDate, false);
+        filtered = filtered.filter(order => {
+          const deliveryDate = parseGermanDate(order.deliveryDate);
+          return isDateInRange(deliveryDate, start, end);
+        });
+      }
+    }
+
+    return filtered;
+  }, [searchQuery, selectedOrderDate, selectedDeliveryDate, selectedOrderedBy, selectedInternalTags, selectedCancellation, selectedGroups, orderDateStart, orderDateEnd, deliveryDateStart, deliveryDateEnd]);
+
+  const renderOrder = ({ item: order }: { item: Order }) => {
+    const isCancelled = order.cancelled || order.internalTags?.toLowerCase().includes('storno');
+    
+    return (
+      <TouchableOpacity 
+        style={styles.orderItem} 
+        activeOpacity={0.7}
+        onPress={() => onOrderPress && onOrderPress(order)}
+      >
+        <View style={styles.orderIconContainer}>
+          <Ionicons name="receipt" size={24} color="#2E2C55" />
+        </View>
+        <View style={styles.orderInfo}>
+          <View style={styles.orderHeaderRow}>
+            <Text style={styles.orderCustomerName} numberOfLines={1}>{order.customer}</Text>
+            {isCancelled && (
+              <View style={styles.cancelledLabel}>
+                <Text style={styles.cancelledLabelText}>Storniert</Text>
+              </View>
+            )}
+          </View>
+          <View style={styles.orderDetails}>
+            <View style={styles.orderDetailRow}>
+              <Ionicons name="calendar-outline" size={14} color="#666" />
+              <Text style={styles.orderDetailText}>{order.deliveryDate}</Text>
+            </View>
+            <View style={styles.orderDetailRow}>
+              <Ionicons name="cube-outline" size={14} color="#666" />
+              <Text style={styles.orderDetailText}>{order.itemCount} Artikel</Text>
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
   };
 
   // Calendar functions
@@ -74,21 +288,6 @@ export default function OrdersScreen({
       month: '2-digit',
       year: 'numeric',
     });
-  };
-
-  const isDateInRange = (date: Date, start: Date | null, end: Date | null) => {
-    if (!start && !end) return false;
-    const dateStr = date.toDateString();
-    if (start && end) {
-      return date >= start && date <= end;
-    }
-    if (start) {
-      return dateStr === start.toDateString();
-    }
-    if (end) {
-      return dateStr === end.toDateString();
-    }
-    return false;
   };
 
   const handleDateSelect = (date: Date) => {
@@ -394,17 +593,21 @@ export default function OrdersScreen({
         </SafeAreaView>
       </View>
       
-      <ScrollView 
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={true}
-      >
-        {/* Hier können später Bestellungen angezeigt werden */}
+      {filteredOrders.length > 0 ? (
+        <FlatList
+          data={filteredOrders}
+          renderItem={renderOrder}
+          keyExtractor={(item) => item.id}
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={true}
+        />
+      ) : (
         <View style={styles.emptyContainer}>
           <Ionicons name="receipt-outline" size={64} color="#ccc" />
           <Text style={styles.emptyText}>Keine Bestellungen gefunden</Text>
         </View>
-      </ScrollView>
+      )}
 
       {/* Filter Modal */}
       <Modal
@@ -830,6 +1033,75 @@ const styles = StyleSheet.create({
     color: '#999',
     marginTop: 16,
     textAlign: 'center',
+  },
+  orderItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#fff',
+    padding: 16,
+    marginBottom: 8,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  orderIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f5f5f5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    flexShrink: 0,
+  },
+  orderInfo: {
+    flex: 1,
+    flexDirection: 'column',
+    minWidth: 0,
+  },
+  orderHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+    gap: 8,
+  },
+  orderCustomerName: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#2E2C55',
+    flex: 1,
+  },
+  cancelledLabel: {
+    backgroundColor: '#F44336',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    alignSelf: 'flex-start',
+  },
+  cancelledLabelText: {
+    fontSize: 12,
+    color: '#fff',
+    fontWeight: '500',
+  },
+  orderDetails: {
+    flexDirection: 'column',
+    gap: 4,
+  },
+  orderDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  orderDetailText: {
+    fontSize: 14,
+    color: '#666',
   },
   modalOverlay: {
     flex: 1,

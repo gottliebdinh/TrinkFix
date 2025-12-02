@@ -7,20 +7,32 @@ import { productData } from '../data/json';
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface OrderItem {
-  id: string;
-  productName: string;
+  name: string;
   quantity: number;
   unit: string;
-  price: number;
+}
+
+interface Address {
+  name: string;
+  street: string;
+  city: string;
+  country: string;
 }
 
 interface Order {
   id: string;
-  date: string;
+  customer: string;
+  orderDate: string;
+  orderDateRaw: string;
+  orderTime: string;
   orderNumber: string;
-  status: 'completed' | 'pending' | 'cancelled';
-  total: number;
+  deliveryDate: string;
+  itemCount: string;
+  email: string;
+  fromAddress: Address;
+  toAddress: Address;
   items: OrderItem[];
+  cancelled?: boolean;
 }
 
 interface OrderDetailScreenProps {
@@ -42,8 +54,13 @@ export default function OrderDetailScreen({
     Object.values(productData).forEach((categoryProducts) => {
       if (Array.isArray(categoryProducts)) {
         categoryProducts.forEach(product => {
-          if (product.Artikelname === productName && product.BildURL) {
-            imageUrl = product.BildURL;
+          // Versuche exakte Übereinstimmung oder Teilübereinstimmung
+          if (product.Artikelname && product.BildURL) {
+            if (product.Artikelname === productName || 
+                product.Artikelname.includes(productName) ||
+                productName.includes(product.Artikelname.split(' ')[0])) {
+              imageUrl = product.BildURL;
+            }
           }
         });
       }
@@ -179,83 +196,94 @@ export default function OrderDetailScreen({
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={true}
           >
+            {/* Von Adresse */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Ionicons name="business-outline" size={18} color="#666" />
                 <Text style={styles.sectionTitle}>Von</Text>
               </View>
-              <Text style={styles.companyName}>TRINKKARTELL GmbH</Text>
-              <View style={styles.addressRow}>
-                <Ionicons name="location-outline" size={16} color="#666" />
-                <Text style={styles.address}>Musterstraße 123</Text>
-              </View>
-              <View style={styles.addressRow}>
-                <Ionicons name="location-outline" size={16} color="#666" />
-                <Text style={styles.address}>90411 Nürnberg</Text>
-              </View>
-              <View style={styles.addressRow}>
-                <Ionicons name="location-outline" size={16} color="#666" />
-                <Text style={styles.address}>Deutschland</Text>
-              </View>
+              <Text style={styles.addressName}>{order.fromAddress.name}</Text>
+              <Text style={styles.addressText}>{order.fromAddress.street}</Text>
+              <Text style={styles.addressText}>{order.fromAddress.city}</Text>
+              <Text style={styles.addressText}>{order.fromAddress.country}</Text>
             </View>
 
+            {/* Zu Adresse */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Ionicons name="person-outline" size={18} color="#666" />
                 <Text style={styles.sectionTitle}>Zu</Text>
               </View>
-              <Text style={styles.companyName}>MOGGI</Text>
-              <View style={styles.addressRow}>
-                <Ionicons name="location-outline" size={16} color="#666" />
-                <Text style={styles.address}>Hauptstraße 45</Text>
-              </View>
-              <View style={styles.addressRow}>
-                <Ionicons name="location-outline" size={16} color="#666" />
-                <Text style={styles.address}>80331 München</Text>
-              </View>
-              <View style={styles.addressRow}>
-                <Ionicons name="location-outline" size={16} color="#666" />
-                <Text style={styles.address}>Deutschland</Text>
-              </View>
+              <Text style={styles.addressName}>{order.toAddress.name}</Text>
+              <Text style={styles.addressText}>{order.toAddress.street}</Text>
+              <Text style={styles.addressText}>{order.toAddress.city}</Text>
+              <Text style={styles.addressText}>{order.toAddress.country}</Text>
             </View>
 
+            {/* Bestelldatum */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Ionicons name="calendar-outline" size={18} color="#666" />
+                <Text style={styles.sectionTitle}>Bestelldatum</Text>
+              </View>
+              <Text style={styles.infoText}>{order.orderDate}</Text>
+            </View>
+
+            {/* Lieferungsdatum */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Ionicons name="calendar-outline" size={18} color="#666" />
+                <Text style={styles.sectionTitle}>Lieferungsdatum</Text>
+              </View>
+              <Text style={styles.infoText}>{order.deliveryDate}</Text>
+            </View>
+
+            {/* Bestellnummer */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Ionicons name="receipt-outline" size={18} color="#666" />
                 <Text style={styles.sectionTitle}>Bestellnummer</Text>
               </View>
-              <Text style={styles.orderNumber}>{order.orderNumber}</Text>
+              <Text style={styles.infoText}>{order.orderNumber}</Text>
             </View>
 
+            {/* Email */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Ionicons name="mail-outline" size={18} color="#666" />
+                <Text style={styles.sectionTitle}>Email</Text>
+              </View>
+              <Text style={styles.infoText}>{order.email}</Text>
+            </View>
+
+            {/* Bestellliste */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Ionicons name="cube-outline" size={18} color="#666" />
-                <Text style={styles.sectionTitle}>Artikel</Text>
+                <Text style={styles.sectionTitle}>Bestellliste</Text>
               </View>
-              {order.items.map((item, index) => {
-                const productImage = getProductImage(item.productName);
+              {order.items && order.items.map((item, index) => {
+                const productImage = getProductImage(item.name);
                 return (
-                  <View key={item.id} style={styles.orderItem}>
+                  <View key={index} style={styles.orderItem}>
                     {productImage ? (
-                      <Image
-                        source={{ uri: productImage }}
-                        style={styles.productImage}
-                        resizeMode="contain"
-                        defaultSource={require('../assets/icon.png')}
-                      />
+                      <View style={styles.productImageContainer}>
+                        <Image 
+                          source={{ uri: productImage }} 
+                          style={styles.productImage}
+                          resizeMode="contain"
+                        />
+                      </View>
                     ) : (
-                      <View style={styles.productImagePlaceholder}>
-                        <Ionicons name="image-outline" size={24} color="#ccc" />
+                      <View style={styles.productImageContainer}>
+                        <Ionicons name="cube-outline" size={24} color="#ccc" />
                       </View>
                     )}
                     <View style={styles.orderItemInfo}>
-                      <Text style={styles.orderItemName}>{item.productName}</Text>
-                      <View style={styles.orderItemQuantityRow}>
-                        <Ionicons name="cube-outline" size={14} color="#666" />
-                        <Text style={styles.orderItemQuantity}>
-                          {item.quantity}x {item.unit}
-                        </Text>
-                      </View>
+                      <Text style={styles.orderItemName}>{item.name}</Text>
+                      <Text style={styles.orderItemDetails}>
+                        {item.quantity} {item.unit}
+                      </Text>
                     </View>
                   </View>
                 );
@@ -388,6 +416,22 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
+  addressName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2E2C55',
+    marginBottom: 8,
+  },
+  addressText: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 4,
+  },
+  infoText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#2E2C55',
+  },
   companyName: {
     fontSize: 18,
     fontWeight: '600',
@@ -416,12 +460,22 @@ const styles = StyleSheet.create({
     borderBottomColor: '#f0f0f0',
     alignItems: 'center',
   },
+  productImageContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
   productImage: {
     width: 60,
     height: 60,
     borderRadius: 8,
     backgroundColor: '#fff',
-    marginRight: 12,
   },
   productImagePlaceholder: {
     width: 60,
@@ -449,6 +503,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#666',
     marginLeft: 4,
+  },
+  orderItemDetails: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 4,
   },
 });
 

@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, TextInput, ScrollView, Modal, FlatList } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import customersData from '../data/Kunden/customers.json';
 
 interface Customer {
   id: string;
@@ -16,26 +17,12 @@ interface Customer {
 interface CustomerScreenProps {
   onBack: () => void;
   onAddCustomer?: () => void;
+  initialActivityLevel?: string | null;
+  onCustomerPress?: (customer: Customer) => void;
 }
 
-// Fiktive Kundendaten
-const MOCK_CUSTOMERS: Customer[] = [
-  { id: '1', name: 'La Dolce Vita', type: 'restaurant', activityLevel: 'aktiv', status: 'hat bestellt', group: 'italiener', country: 'Deutschland' },
-  { id: '2', name: 'Biergarten am Main', type: 'restaurant', activityLevel: 'aktiv', status: 'hat bestellt', group: 'würzburg', country: 'Deutschland' },
-  { id: '3', name: 'Club Matrix', type: 'club', activityLevel: 'aktiv', status: 'hat bestellt', group: 'mach1 gruppe', country: 'Deutschland' },
-  { id: '4', name: 'Bar Central', type: 'bar', activityLevel: 'ruhend', status: 'Einladung angenommen', group: 'montag', country: 'Deutschland' },
-  { id: '5', name: 'Ristorante Bella', type: 'restaurant', activityLevel: 'aktiv', status: 'hat bestellt', group: 'italiener', country: 'Deutschland' },
-  { id: '6', name: 'Nightclub Eclipse', type: 'club', activityLevel: 'inaktiv', status: 'nicht angenommen', group: 'dienstag', country: 'Deutschland' },
-  { id: '7', name: 'Cocktail Lounge', type: 'bar', activityLevel: 'passiv', status: 'Daten unvollständig', group: 'würzburg', country: 'Deutschland' },
-  { id: '8', name: 'Trattoria Toscana', type: 'restaurant', activityLevel: 'aktiv', status: 'hat bestellt', group: 'italiener', country: 'Deutschland' },
-  { id: '9', name: 'Beer Garden', type: 'bar', activityLevel: 'aktiv', status: 'hat bestellt', group: 'würzburg', country: 'Deutschland' },
-  { id: '10', name: 'Disco Inferno', type: 'club', activityLevel: 'ruhend', status: 'Einladung angenommen', group: 'mach1 gruppe', country: 'Deutschland' },
-  { id: '11', name: 'Pizzeria Napoli', type: 'restaurant', activityLevel: 'aktiv', status: 'hat bestellt', group: 'italiener', country: 'Deutschland' },
-  { id: '12', name: 'Rooftop Bar', type: 'bar', activityLevel: 'aktiv', status: 'hat bestellt', group: 'montag', country: 'Deutschland' },
-  { id: '13', name: 'Jazz Club', type: 'club', activityLevel: 'inaktiv', status: 'nicht erlaubt zu bestellen', group: 'dienstag', country: 'Deutschland' },
-  { id: '14', name: 'Steakhouse Premium', type: 'restaurant', activityLevel: 'aktiv', status: 'hat bestellt', group: 'würzburg', country: 'Deutschland' },
-  { id: '15', name: 'Sports Bar', type: 'bar', activityLevel: 'ruhend', status: 'Keine Einladung erstellt', group: 'mach1 gruppe', country: 'Deutschland' },
-];
+// Kundendaten aus CSV importiert
+const MOCK_CUSTOMERS: Customer[] = customersData as Customer[];
 
 const ACTIVITY_LEVELS = ['aktiv', 'ruhend', 'inaktiv', 'passiv'];
 const CUSTOMER_STATUSES = [
@@ -54,10 +41,14 @@ const PRICE_OPTIONS = ['mit spezifischen preisen', 'ohne spezifische preisen'];
 export default function CustomerScreen({
   onBack,
   onAddCustomer,
+  initialActivityLevel,
+  onCustomerPress,
 }: CustomerScreenProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilterModal, setShowFilterModal] = useState(false);
-  const [selectedActivityLevels, setSelectedActivityLevels] = useState<Set<string>>(new Set());
+  const [selectedActivityLevels, setSelectedActivityLevels] = useState<Set<string>>(
+    initialActivityLevel ? new Set([initialActivityLevel]) : new Set()
+  );
   const [selectedCustomerStatuses, setSelectedCustomerStatuses] = useState<Set<string>>(new Set());
   const [selectedGroups, setSelectedGroups] = useState<Set<string>>(new Set());
   const [selectedArea, setSelectedArea] = useState<string | null>(null);
@@ -74,6 +65,89 @@ export default function CustomerScreen({
     setFilterSet(newSet);
   };
 
+  // Bestimme das Aktivitätslevel basierend auf dem Status-Text
+  const getActivityLevelFromStatus = (status: string): string => {
+    const statusLower = status.toLowerCase();
+    
+    // Prüfe ob es ein Bestelldatum gibt
+    if (statusLower.includes('bestellt')) {
+      // Tage: aktiv wenn <= 14, ruhend wenn 15-20, inaktiv wenn >= 21
+      if (statusLower.includes('vor') && statusLower.includes('tag')) {
+        const dayMatch = statusLower.match(/vor (\d+) tag/i);
+        if (dayMatch) {
+          const days = parseInt(dayMatch[1], 10);
+          if (days <= 14) {
+            return 'aktiv';
+          } else if (days <= 20) {
+            return 'ruhend';
+          } else {
+            return 'inaktiv';
+          }
+        }
+      }
+      
+      // Monate: inaktiv wenn 1-2 Monate, passiv ab 3 Monaten
+      if (statusLower.includes('vor') && statusLower.includes('monat')) {
+        // "vor einem Monat" oder "vor ein Monat" oder "vor 1 monat"
+        if (statusLower.includes('einem monat') || statusLower.includes('ein monat') || statusLower.includes('1 monat')) {
+          return 'inaktiv';
+        }
+        
+        // Extrahiere die Anzahl der Monate
+        const monthMatch = statusLower.match(/vor (\d+) monat/i);
+        if (monthMatch) {
+          const months = parseInt(monthMatch[1], 10);
+          if (months < 3) {
+            return 'inaktiv'; // 1-2 Monate
+          } else {
+            return 'passiv'; // 3+ Monate
+          }
+        }
+        
+        // "vor 2 monaten" oder ähnlich
+        if (statusLower.includes('2 monat')) {
+          return 'inaktiv';
+        }
+        
+        // 3 Monate oder mehr
+        if (statusLower.includes('3 monat') || statusLower.includes('4 monat') || 
+            statusLower.includes('5 monat') || statusLower.includes('6 monat')) {
+          return 'passiv';
+        }
+      }
+      
+      // Jahre: immer passiv
+      if (statusLower.includes('vor') && (statusLower.includes('jahr') || statusLower.includes('jahre'))) {
+        return 'passiv';
+      }
+    }
+    
+    // "Noch keine Bestellung seit" - inaktiv wenn mehr als 21 Tage
+    if (statusLower.includes('noch keine bestellung seit')) {
+      // Tage
+      if (statusLower.includes('tag')) {
+        const dayMatch = statusLower.match(/seit (\d+) tag/i);
+        if (dayMatch) {
+          const days = parseInt(dayMatch[1], 10);
+          if (days > 21) {
+            return 'inaktiv';
+          }
+        }
+      }
+      
+      // Monate oder Jahre - immer inaktiv/passiv
+      if (statusLower.includes('monat')) {
+        return 'inaktiv';
+      }
+      if (statusLower.includes('jahr')) {
+        return 'passiv';
+      }
+    }
+    
+    // Standard: passiv für alle anderen Status
+    return 'passiv';
+  };
+
   // Filtere Kunden basierend auf Suchanfrage und Filtern
   const filteredCustomers = useMemo(() => {
     let filtered = MOCK_CUSTOMERS;
@@ -86,11 +160,12 @@ export default function CustomerScreen({
       );
     }
 
-    // Aktivitätslevel
+    // Aktivitätslevel - basierend auf Status-Text
     if (selectedActivityLevels.size > 0) {
-      filtered = filtered.filter(customer => 
-        selectedActivityLevels.has(customer.activityLevel)
-      );
+      filtered = filtered.filter(customer => {
+        const activityLevel = getActivityLevelFromStatus(customer.status);
+        return selectedActivityLevels.has(activityLevel);
+      });
     }
 
     // Kundenstatus
@@ -117,14 +192,108 @@ export default function CustomerScreen({
     return filtered;
   }, [searchQuery, selectedActivityLevels, selectedCustomerStatuses, selectedGroups, selectedCountry]);
 
-  const renderCustomer = ({ item: customer }: { item: Customer }) => (
-    <TouchableOpacity style={styles.customerItem} activeOpacity={0.7}>
-      <View style={styles.customerIconContainer}>
-        <Ionicons name="person" size={24} color="#2E2C55" />
-      </View>
-      <Text style={styles.customerName}>{customer.name}</Text>
-    </TouchableOpacity>
-  );
+  const getStatusLabelColor = (status: string) => {
+    const statusLower = status.toLowerCase();
+    
+    // Prüfe ob es ein Bestelldatum gibt
+    if (statusLower.includes('bestellt')) {
+      // Tage: Grün wenn <= 14 Tage, Gelb wenn 15-30 Tage, Rot wenn > 21 Tage
+      if (statusLower.includes('vor') && statusLower.includes('tag')) {
+        const dayMatch = statusLower.match(/vor (\d+) tag/i);
+        if (dayMatch) {
+          const days = parseInt(dayMatch[1], 10);
+          if (days <= 14) {
+            return '#4CAF50'; // Grün
+          } else if (days <= 21) {
+            return '#FFC107'; // Gelb (zwischen 14 und 21 Tagen)
+          } else if (days < 30) {
+            return '#F44336'; // Rot (mehr als 21 Tage aber weniger als 1 Monat - inaktiv)
+          } else {
+            return '#F44336'; // Rot (>= 30 Tage, also >= 1 Monat)
+          }
+        }
+      }
+      
+      // Monate: Rot wenn 1-2 Monate, Grau ab 3 Monaten
+      if (statusLower.includes('vor') && statusLower.includes('monat')) {
+        // "vor einem Monat" oder "vor ein Monat"
+        if (statusLower.includes('einem monat') || statusLower.includes('ein monat') || statusLower.includes('1 monat')) {
+          return '#F44336'; // Rot
+        }
+        
+        // Extrahiere die Anzahl der Monate
+        const monthMatch = statusLower.match(/vor (\d+) monat/i);
+        if (monthMatch) {
+          const months = parseInt(monthMatch[1], 10);
+          if (months < 3) {
+            return '#F44336'; // Rot (1-2 Monate)
+          } else {
+            return '#9E9E9E'; // Grau (3+ Monate)
+          }
+        }
+        
+        // "vor 2 monaten" oder ähnlich
+        if (statusLower.includes('2 monat')) {
+          return '#F44336'; // Rot
+        }
+        
+        // 3 Monate oder mehr
+        if (statusLower.includes('3 monat') || statusLower.includes('4 monat') || 
+            statusLower.includes('5 monat') || statusLower.includes('6 monat')) {
+          return '#9E9E9E'; // Grau
+        }
+      }
+      
+      // Jahre: immer Grau
+      if (statusLower.includes('vor') && (statusLower.includes('jahr') || statusLower.includes('jahre'))) {
+        return '#9E9E9E'; // Grau
+      }
+    }
+    
+    // "Noch keine Bestellung seit" - Rot wenn mehr als 21 Tage
+    if (statusLower.includes('noch keine bestellung seit')) {
+      // Tage
+      if (statusLower.includes('tag')) {
+        const dayMatch = statusLower.match(/seit (\d+) tag/i);
+        if (dayMatch) {
+          const days = parseInt(dayMatch[1], 10);
+          if (days > 21) {
+            return '#F44336'; // Rot (inaktiv)
+          }
+        }
+      }
+      
+      // Monate oder Jahre - immer rot (inaktiv)
+      if (statusLower.includes('monat') || statusLower.includes('jahr')) {
+        return '#F44336'; // Rot
+      }
+    }
+    
+    // Standard: Grau für alle anderen Status
+    return '#9E9E9E';
+  };
+
+  const renderCustomer = ({ item: customer }: { item: Customer }) => {
+    const statusColor = getStatusLabelColor(customer.status);
+    
+    return (
+      <TouchableOpacity 
+        style={styles.customerItem} 
+        activeOpacity={0.7}
+        onPress={() => onCustomerPress && onCustomerPress(customer)}
+      >
+        <View style={styles.customerIconContainer}>
+          <Ionicons name="person" size={24} color="#2E2C55" />
+        </View>
+        <View style={styles.customerInfo}>
+          <Text style={styles.customerName}>{customer.name}</Text>
+          <View style={[styles.customerStatusLabel, { backgroundColor: statusColor }]}>
+            <Text style={styles.customerStatusText} numberOfLines={1}>{customer.status}</Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -168,17 +337,35 @@ export default function CustomerScreen({
             >
               {selectedActivityLevels.size > 0 || selectedCustomerStatuses.size > 0 || selectedGroups.size > 0 || selectedArea || selectedPrice || selectedCountry ? (
                 <>
-                  {Array.from(selectedActivityLevels).map(level => (
-                    <TouchableOpacity
-                      key={level}
-                      style={styles.filterChip}
-                      onPress={() => toggleFilter(selectedActivityLevels, setSelectedActivityLevels, level)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.filterChipText}>{level}</Text>
-                      <Ionicons name="close-circle" size={16} color="#2E2C55" style={styles.filterChipClose} />
-                    </TouchableOpacity>
-                  ))}
+                  {Array.from(selectedActivityLevels).map(level => {
+                    const getActivityColor = () => {
+                      switch (level) {
+                        case 'aktiv':
+                          return '#4CAF50'; // Grün
+                        case 'ruhend':
+                          return '#FFC107'; // Gelb
+                        case 'inaktiv':
+                          return '#F44336'; // Rot
+                        case 'passiv':
+                          return '#9E9E9E'; // Grau
+                        default:
+                          return '#2E2C55';
+                      }
+                    };
+                    const activityColor = getActivityColor();
+                    return (
+                      <TouchableOpacity
+                        key={level}
+                        style={styles.filterChip}
+                        onPress={() => toggleFilter(selectedActivityLevels, setSelectedActivityLevels, level)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={[styles.activityColorDot, { backgroundColor: activityColor }]} />
+                        <Text style={styles.filterChipText}>{level}</Text>
+                        <Ionicons name="close-circle" size={16} color="#2E2C55" style={styles.filterChipClose} />
+                      </TouchableOpacity>
+                    );
+                  })}
                   {Array.from(selectedCustomerStatuses).map(status => (
                     <TouchableOpacity
                       key={status}
@@ -585,7 +772,7 @@ const styles = StyleSheet.create({
   },
   customerItem: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     backgroundColor: '#fff',
     padding: 16,
     marginBottom: 8,
@@ -607,12 +794,30 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+    flexShrink: 0,
+  },
+  customerInfo: {
+    flex: 1,
+    flexDirection: 'column',
+    minWidth: 0,
   },
   customerName: {
     fontSize: 16,
     fontWeight: '500',
     color: '#2E2C55',
-    flex: 1,
+    marginBottom: 6,
+    flexWrap: 'wrap',
+  },
+  customerStatusLabel: {
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    alignSelf: 'flex-start',
+  },
+  customerStatusText: {
+    fontSize: 12,
+    color: '#fff',
+    fontWeight: '400',
   },
   footer: {
     position: 'absolute',

@@ -15,6 +15,7 @@ import OrderHistoryScreen from './screens/OrderHistoryScreen';
 import OrderDetailScreen from './screens/OrderDetailScreen';
 import SalesAppScreen from './screens/SalesAppScreen';
 import CustomerScreen from './screens/CustomerScreen';
+import CustomerDetailScreen from './screens/CustomerDetailScreen';
 import AddCustomerScreen from './screens/AddCustomerScreen';
 import OrdersScreen from './screens/OrdersScreen';
 
@@ -41,10 +42,13 @@ export default function App() {
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [showSalesApp, setShowSalesApp] = useState(false);
   const [showCustomerScreen, setShowCustomerScreen] = useState(false);
+  const [showCustomerDetail, setShowCustomerDetail] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
   const [showAddCustomerScreen, setShowAddCustomerScreen] = useState(false);
   const [showOrdersScreen, setShowOrdersScreen] = useState(false);
   const [shouldFocusSearch, setShouldFocusSearch] = useState(false);
   const [initialFilter, setInitialFilter] = useState<string | null>(null);
+  const [initialActivityLevelFilter, setInitialActivityLevelFilter] = useState<string | null>(null);
 
   // Berechne Gesamtanzahl aller Artikel mit useMemo
   const totalProducts = useMemo(() => {
@@ -316,6 +320,11 @@ export default function App() {
         <SalesAppScreen
           onBack={() => setShowSalesApp(false)}
           onCustomerPress={() => {
+            setInitialActivityLevelFilter(null);
+            setShowCustomerScreen(true);
+          }}
+          onShowInactiveCustomers={() => {
+            setInitialActivityLevelFilter('inaktiv');
             setShowCustomerScreen(true);
           }}
           onOrdersPress={() => {
@@ -331,11 +340,28 @@ export default function App() {
           }}
         />
       )}
-      {showCustomerScreen && !showAddCustomerScreen && (
+      {showCustomerScreen && !showAddCustomerScreen && !showCustomerDetail && (
         <CustomerScreen
-          onBack={() => setShowCustomerScreen(false)}
+          onBack={() => {
+            setInitialActivityLevelFilter(null);
+            setShowCustomerScreen(false);
+          }}
           onAddCustomer={() => {
             setShowAddCustomerScreen(true);
+          }}
+          initialActivityLevel={initialActivityLevelFilter}
+          onCustomerPress={(customer) => {
+            setSelectedCustomer(customer);
+            setShowCustomerDetail(true);
+          }}
+        />
+      )}
+      {showCustomerScreen && showCustomerDetail && selectedCustomer && (
+        <CustomerDetailScreen
+          customer={selectedCustomer}
+          onBack={() => {
+            setShowCustomerDetail(false);
+            setSelectedCustomer(null);
           }}
         />
       )}
@@ -352,6 +378,19 @@ export default function App() {
       {showOrdersScreen && (
         <OrdersScreen
           onBack={() => setShowOrdersScreen(false)}
+          onOrderPress={(order) => {
+            setSelectedOrder(order);
+            setShowOrderDetail(true);
+          }}
+        />
+      )}
+      {showOrdersScreen && showOrderDetail && selectedOrder && !showOrderHistory && (
+        <OrderDetailScreen
+          order={selectedOrder}
+          onBack={() => {
+            setShowOrderDetail(false);
+            setSelectedOrder(null);
+          }}
         />
       )}
       {/* FavoritesScreen als Overlay über HomeScreen */}
@@ -518,7 +557,7 @@ export default function App() {
         />
       )}
       {/* OrderDetailScreen als Overlay über OrderHistoryScreen */}
-      {showOrderDetail && selectedOrder && (
+      {showOrderHistory && showOrderDetail && selectedOrder && (
         <OrderDetailScreen
           order={selectedOrder}
           onBack={() => {

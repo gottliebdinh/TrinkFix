@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, TextInput, ScrollView, Modal, FlatList } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,6 +20,7 @@ interface Order {
 interface OrdersScreenProps {
   onBack: () => void;
   onOrderPress?: (order: Order) => void;
+  initialSearchQuery?: string;
 }
 
 const ORDER_DATES = ['letzte 2h', 'letzte 7 tage', 'letzte 4 wochen', 'diesen monat', 'letzten 6 monat', 'letztes jahr'];
@@ -32,8 +33,15 @@ const GROUPS = ['würzburg', 'mach1 gruppe', 'italiener', 'montag', 'dienstag'];
 export default function OrdersScreen({
   onBack,
   onOrderPress,
+  initialSearchQuery = '',
 }: OrdersScreenProps) {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
+
+  useEffect(() => {
+    if (initialSearchQuery) {
+      setSearchQuery(initialSearchQuery);
+    }
+  }, [initialSearchQuery]);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [selectedOrderDate, setSelectedOrderDate] = useState<string | null>(null);
   const [selectedDeliveryDate, setSelectedDeliveryDate] = useState<string | null>(null);
@@ -166,8 +174,8 @@ export default function OrdersScreen({
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(order => 
-        order.customer.toLowerCase().includes(query) ||
-        order.orderNumber.toLowerCase().includes(query)
+        (order.customer || '').toLowerCase().includes(query) ||
+        (order.orderNumber || '').toLowerCase().includes(query)
       );
     }
 
@@ -175,11 +183,11 @@ export default function OrdersScreen({
     if (selectedCancellation) {
       if (selectedCancellation === 'storniert') {
         filtered = filtered.filter(order => 
-          order.cancelled || order.internalTags?.toLowerCase().includes('storno')
+          order.cancelled || (order.internalTags && order.internalTags.toLowerCase().includes('storno'))
         );
       } else if (selectedCancellation === 'nicht storniert') {
         filtered = filtered.filter(order => 
-          !order.cancelled && !order.internalTags?.toLowerCase().includes('storno')
+          !order.cancelled && (!order.internalTags || !order.internalTags.toLowerCase().includes('storno'))
         );
       }
     }
@@ -189,14 +197,14 @@ export default function OrdersScreen({
       if (orderDateStart || orderDateEnd) {
         // Benutzerdefinierte Termine
         filtered = filtered.filter(order => {
-          const orderDate = parseGermanDate(order.orderDateRaw);
+          const orderDate = parseGermanDate(order.orderDateRaw || '');
           return isDateInRange(orderDate, orderDateStart, orderDateEnd);
         });
       } else if (selectedOrderDate) {
         // Vordefinierte Filter
         const { start, end } = getDateFromFilter(selectedOrderDate, true);
         filtered = filtered.filter(order => {
-          const orderDate = parseGermanDate(order.orderDateRaw);
+          const orderDate = parseGermanDate(order.orderDateRaw || '');
           return isDateInRange(orderDate, start, end);
         });
       }
@@ -207,14 +215,14 @@ export default function OrdersScreen({
       if (deliveryDateStart || deliveryDateEnd) {
         // Benutzerdefinierte Termine
         filtered = filtered.filter(order => {
-          const deliveryDate = parseGermanDate(order.deliveryDate);
+          const deliveryDate = parseGermanDate(order.deliveryDate || '');
           return isDateInRange(deliveryDate, deliveryDateStart, deliveryDateEnd);
         });
       } else if (selectedDeliveryDate) {
         // Vordefinierte Filter
         const { start, end } = getDateFromFilter(selectedDeliveryDate, false);
         filtered = filtered.filter(order => {
-          const deliveryDate = parseGermanDate(order.deliveryDate);
+          const deliveryDate = parseGermanDate(order.deliveryDate || '');
           return isDateInRange(deliveryDate, start, end);
         });
       }
@@ -224,7 +232,7 @@ export default function OrdersScreen({
   }, [searchQuery, selectedOrderDate, selectedDeliveryDate, selectedOrderedBy, selectedInternalTags, selectedCancellation, selectedGroups, orderDateStart, orderDateEnd, deliveryDateStart, deliveryDateEnd]);
 
   const renderOrder = ({ item: order }: { item: Order }) => {
-    const isCancelled = order.cancelled || order.internalTags?.toLowerCase().includes('storno');
+    const isCancelled = order.cancelled || (order.internalTags && order.internalTags.toLowerCase().includes('storno'));
     
     return (
       <TouchableOpacity 

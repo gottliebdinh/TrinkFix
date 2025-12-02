@@ -48,17 +48,22 @@ export default function OrderDetailScreen({
   const opacity = useRef(new Animated.Value(0)).current;
 
   // Finde Produktbilder für die Artikel
-  const getProductImage = (productName: string): string | null => {
+  const getProductImage = (productName: string | undefined | null): string | null => {
+    if (!productName) return null;
+    
     let imageUrl: string | null = null;
+    const productNameStr = String(productName);
     
     Object.values(productData).forEach((categoryProducts) => {
       if (Array.isArray(categoryProducts)) {
         categoryProducts.forEach(product => {
           // Versuche exakte Übereinstimmung oder Teilübereinstimmung
           if (product.Artikelname && product.BildURL) {
-            if (product.Artikelname === productName || 
-                product.Artikelname.includes(productName) ||
-                productName.includes(product.Artikelname.split(' ')[0])) {
+            const artikelNameStr = String(product.Artikelname);
+            const firstWord = artikelNameStr.split(' ')[0];
+            if (artikelNameStr === productNameStr || 
+                artikelNameStr.includes(productNameStr) ||
+                (firstWord && productNameStr.includes(firstWord))) {
               imageUrl = product.BildURL;
             }
           }
@@ -197,28 +202,32 @@ export default function OrderDetailScreen({
             showsVerticalScrollIndicator={true}
           >
             {/* Von Adresse */}
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <Ionicons name="business-outline" size={18} color="#666" />
-                <Text style={styles.sectionTitle}>Von</Text>
+            {order.fromAddress && (
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Ionicons name="business-outline" size={18} color="#666" />
+                  <Text style={styles.sectionTitle}>Von</Text>
+                </View>
+                <Text style={styles.addressName}>{order.fromAddress.name || 'Trinkkartell GmbH'}</Text>
+                <Text style={styles.addressText}>{order.fromAddress.street || ''}</Text>
+                <Text style={styles.addressText}>{order.fromAddress.city || ''}</Text>
+                <Text style={styles.addressText}>{order.fromAddress.country || 'Deutschland'}</Text>
               </View>
-              <Text style={styles.addressName}>{order.fromAddress.name}</Text>
-              <Text style={styles.addressText}>{order.fromAddress.street}</Text>
-              <Text style={styles.addressText}>{order.fromAddress.city}</Text>
-              <Text style={styles.addressText}>{order.fromAddress.country}</Text>
-            </View>
+            )}
 
             {/* Zu Adresse */}
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <Ionicons name="person-outline" size={18} color="#666" />
-                <Text style={styles.sectionTitle}>Zu</Text>
+            {order.toAddress && (
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Ionicons name="person-outline" size={18} color="#666" />
+                  <Text style={styles.sectionTitle}>Zu</Text>
+                </View>
+                <Text style={styles.addressName}>{order.toAddress.name || order.customer || ''}</Text>
+                <Text style={styles.addressText}>{order.toAddress.street || ''}</Text>
+                <Text style={styles.addressText}>{order.toAddress.city || ''}</Text>
+                <Text style={styles.addressText}>{order.toAddress.country || 'Deutschland'}</Text>
               </View>
-              <Text style={styles.addressName}>{order.toAddress.name}</Text>
-              <Text style={styles.addressText}>{order.toAddress.street}</Text>
-              <Text style={styles.addressText}>{order.toAddress.city}</Text>
-              <Text style={styles.addressText}>{order.toAddress.country}</Text>
-            </View>
+            )}
 
             {/* Bestelldatum */}
             <View style={styles.section}>
@@ -226,7 +235,7 @@ export default function OrderDetailScreen({
                 <Ionicons name="calendar-outline" size={18} color="#666" />
                 <Text style={styles.sectionTitle}>Bestelldatum</Text>
               </View>
-              <Text style={styles.infoText}>{order.orderDate}</Text>
+              <Text style={styles.infoText}>{order.orderDate || order.orderDateRaw || ''}</Text>
             </View>
 
             {/* Lieferungsdatum */}
@@ -235,7 +244,7 @@ export default function OrderDetailScreen({
                 <Ionicons name="calendar-outline" size={18} color="#666" />
                 <Text style={styles.sectionTitle}>Lieferungsdatum</Text>
               </View>
-              <Text style={styles.infoText}>{order.deliveryDate}</Text>
+              <Text style={styles.infoText}>{order.deliveryDate || ''}</Text>
             </View>
 
             {/* Bestellnummer */}
@@ -244,7 +253,7 @@ export default function OrderDetailScreen({
                 <Ionicons name="receipt-outline" size={18} color="#666" />
                 <Text style={styles.sectionTitle}>Bestellnummer</Text>
               </View>
-              <Text style={styles.infoText}>{order.orderNumber}</Text>
+              <Text style={styles.infoText}>{order.orderNumber || ''}</Text>
             </View>
 
             {/* Email */}
@@ -253,7 +262,7 @@ export default function OrderDetailScreen({
                 <Ionicons name="mail-outline" size={18} color="#666" />
                 <Text style={styles.sectionTitle}>Email</Text>
               </View>
-              <Text style={styles.infoText}>{order.email}</Text>
+              <Text style={styles.infoText}>{order.email || ''}</Text>
             </View>
 
             {/* Bestellliste */}
@@ -262,8 +271,9 @@ export default function OrderDetailScreen({
                 <Ionicons name="cube-outline" size={18} color="#666" />
                 <Text style={styles.sectionTitle}>Bestellliste</Text>
               </View>
-              {order.items && order.items.map((item, index) => {
-                const productImage = getProductImage(item.name);
+              {order.items && Array.isArray(order.items) && order.items.length > 0 ? (
+                order.items.map((item, index) => {
+                  const productImage = getProductImage(item?.name);
                 return (
                   <View key={index} style={styles.orderItem}>
                     {productImage ? (
@@ -280,14 +290,17 @@ export default function OrderDetailScreen({
                       </View>
                     )}
                     <View style={styles.orderItemInfo}>
-                      <Text style={styles.orderItemName}>{item.name}</Text>
+                      <Text style={styles.orderItemName}>{item?.name || 'Unbekanntes Produkt'}</Text>
                       <Text style={styles.orderItemDetails}>
-                        {item.quantity} {item.unit}
+                        {item?.quantity || 0} {item?.unit || ''}
                       </Text>
                     </View>
                   </View>
                 );
-              })}
+                })
+              ) : (
+                <Text style={styles.noDataText}>Keine Artikel in dieser Bestellung</Text>
+              )}
             </View>
           </ScrollView>
         </View>
@@ -508,6 +521,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginTop: 4,
+  },
+  noDataText: {
+    fontSize: 14,
+    color: '#999',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    paddingVertical: 20,
   },
 });
 

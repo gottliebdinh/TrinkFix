@@ -1,7 +1,8 @@
-import React, { useRef, useEffect } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Animated, PanResponder, Dimensions } from 'react-native';
+import React, { useRef, useEffect, useState } from 'react';
+import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Animated, PanResponder, Dimensions, Modal, Share, Linking } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import QRCode from 'react-native-qrcode-svg';
 import ordersData from '../data/Bestellungen/orders.json';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -15,6 +16,15 @@ interface Customer {
   group: string;
   country: string;
   phone?: string;
+  email?: string;
+  toAddress?: {
+    name: string;
+    street: string;
+    number?: string;
+    postalCode?: string;
+    city: string;
+    country: string;
+  };
   averageOrderValue?: number;
   orderFrequency?: string;
   revenueYTD?: number;
@@ -28,14 +38,56 @@ interface Customer {
 interface CustomerDetailScreenProps {
   customer: Customer;
   onBack: () => void;
+  onShowAllOrders?: (customerName: string) => void;
+  onChatPress?: (customer: Customer) => void;
+  onOrderPress?: (order: any) => void;
 }
 
 export default function CustomerDetailScreen({
   customer,
   onBack,
+  onShowAllOrders,
+  onChatPress,
+  onOrderPress,
 }: CustomerDetailScreenProps) {
   const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const opacity = useRef(new Animated.Value(0)).current;
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteCode, setInviteCode] = useState<string>('');
+
+  // Generiere Einladungscode beim Öffnen des Modals
+  const generateInviteCode = () => {
+    // Generiere einen 8-stelligen Code
+    const code = Math.random().toString(36).substring(2, 10).toUpperCase();
+    setInviteCode(code);
+    setShowInviteModal(true);
+  };
+
+  const shareInviteLink = async () => {
+    const inviteLink = `https://trinkkartell.app/invite/${inviteCode}`;
+    try {
+      await Share.share({
+        message: `Einladungscode: ${inviteCode}\n\nLink: ${inviteLink}`,
+        title: 'Einladung senden',
+      });
+    } catch (error) {
+      console.error('Error sharing:', error);
+    }
+  };
+
+  const handlePhoneCall = () => {
+    if (customer.phone) {
+      const phoneNumber = customer.phone.replace(/\s/g, '');
+      Linking.openURL(`tel:${phoneNumber}`);
+    }
+  };
+
+  const handleEmailClick = () => {
+    if (customer.email) {
+      const subject = encodeURIComponent(`Anfrage für ${customer.name}`);
+      Linking.openURL(`mailto:${customer.email}?subject=${subject}`);
+    }
+  };
 
   useEffect(() => {
     Animated.parallel([
@@ -124,11 +176,20 @@ export default function CustomerDetailScreen({
 
   // Finde letzte Bestellungen für diesen Kunden
   const customerOrders = (ordersData as any[])
-    .filter(order => order.customer === customer.name)
+    .filter(order => {
+      // Exakte Übereinstimmung oder Teilübereinstimmung
+      const orderCustomerStr = String(order?.customer || '').toLowerCase().trim();
+      const customerNameStr = String(customer?.name || '').toLowerCase().trim();
+      if (!orderCustomerStr || !customerNameStr) return false;
+      return orderCustomerStr === customerNameStr || 
+             orderCustomerStr.includes(customerNameStr) || 
+             customerNameStr.includes(orderCustomerStr);
+    })
     .slice(0, 3);
 
   const getStatusLabelColor = (status: string) => {
-    const statusLower = status.toLowerCase();
+    if (!status) return '#9E9E9E';
+    const statusLower = String(status).toLowerCase();
     
     if (statusLower.includes('bestellt')) {
       if (statusLower.includes('vor') && statusLower.includes('tag')) {
@@ -252,19 +313,67 @@ export default function CustomerDetailScreen({
                     <Text style={styles.customerStatusText}>{customer.status}</Text>
                   </View>
                   {customer.phone && (
-                    <View style={styles.phoneRow}>
-                      <Ionicons name="call-outline" size={16} color="#666" />
-                      <Text style={styles.phoneText}>{customer.phone}</Text>
+                    <TouchableOpacity 
+                      style={styles.contactRow}
+                      onPress={handlePhoneCall}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="call-outline" size={16} color="#2E2C55" />
+                      <Text style={styles.contactText}>{customer.phone}</Text>
+                    </TouchableOpacity>
+                  )}
+                  {customer.toAddress && (
+                    <View style={styles.contactRow}>
+                      <Ionicons name="location-outline" size={16} color="#666" />
+                      <View style={styles.addressContainer}>
+                        <Text style={styles.contactText}>
+                          {customer.toAddress.street}{customer.toAddress.number ? ` ${customer.toAddress.number}` : ''}
+                        </Text>
+                        {customer.toAddress.postalCode && customer.toAddress.city && (
+                          <Text style={styles.contactText}>
+                            {customer.toAddress.postalCode} {customer.toAddress.city}
+                          </Text>
+                        )}
+                        {!customer.toAddress.postalCode && customer.toAddress.city && (
+                          <Text style={styles.contactText}>
+                            {customer.toAddress.city}
+                          </Text>
+                        )}
+                      </View>
                     </View>
+                  )}
+                  {customer.email && (
+                    <TouchableOpacity 
+                      style={styles.contactRow}
+                      onPress={handleEmailClick}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="mail-outline" size={16} color="#2E2C55" />
+                      <Text style={styles.contactText}>{customer.email}</Text>
+                    </TouchableOpacity>
                   )}
                 </View>
               </View>
               <View style={styles.actionButtons}>
-                <TouchableOpacity style={styles.actionButton} activeOpacity={0.7}>
-                  <Ionicons name="chatbubble-outline" size={24} color="#2E2C55" />
+                <TouchableOpacity 
+                  style={styles.actionButton} 
+                  activeOpacity={0.7}
+                  onPress={() => onChatPress && onChatPress(customer)}
+                >
+                  <View style={styles.actionButtonContent}>
+                    <Ionicons name="chatbubble-outline" size={20} color="#2E2C55" />
+                    <Text style={styles.actionButtonText}>Chat</Text>
+                  </View>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.actionButton} activeOpacity={0.7}>
-                  <Ionicons name="person-add-outline" size={24} color="#2E2C55" />
+                <TouchableOpacity 
+                  style={styles.actionButton} 
+                  activeOpacity={0.7}
+                  onPress={generateInviteCode}
+                >
+                  <View style={styles.actionButtonContent}>
+                    <Ionicons name="person-add-outline" size={20} color="#2E2E2C55" />
+                    <Text style={styles.actionButtonText}>Hinzufügen</Text>
+                  </View>
                 </TouchableOpacity>
               </View>
             </View>
@@ -298,15 +407,32 @@ export default function CustomerDetailScreen({
               {customerOrders.length === 0 ? (
                 <Text style={styles.noDataText}>Noch keine Bestellung</Text>
               ) : (
-                customerOrders.map((order, index) => (
-                  <View key={index} style={styles.orderRow}>
-                    <View style={styles.orderInfo}>
-                      <Text style={styles.orderNumber}>{order.orderNumber}</Text>
-                      <Text style={styles.orderDate}>{order.orderDate}</Text>
-                    </View>
-                    <Text style={styles.orderItems}>{order.itemCount} Artikel</Text>
-                  </View>
-                ))
+                <>
+                  {customerOrders.map((order, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.orderRow}
+                      onPress={() => onOrderPress && onOrderPress(order)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.orderInfo}>
+                        <Text style={styles.orderNumber}>{order?.orderNumber || 'N/A'}</Text>
+                        <Text style={styles.orderDate}>{order?.orderDate || 'N/A'}</Text>
+                      </View>
+                      <Text style={styles.orderItems}>{order?.itemCount || '0'} Artikel</Text>
+                    </TouchableOpacity>
+                  ))}
+                  {onShowAllOrders && (
+                    <TouchableOpacity 
+                      style={styles.showAllButton}
+                      onPress={() => onShowAllOrders(customer.name)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.showAllButtonText}>Alle Bestellungen anzeigen</Text>
+                      <Ionicons name="chevron-forward" size={20} color="#2E2C55" />
+                    </TouchableOpacity>
+                  )}
+                </>
               )}
             </View>
 
@@ -368,6 +494,56 @@ export default function CustomerDetailScreen({
           </ScrollView>
         </View>
       </Animated.View>
+
+      {/* Einladungs-Modal */}
+      <Modal
+        visible={showInviteModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowInviteModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => setShowInviteModal(false)}
+          />
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Einladungscode</Text>
+              <TouchableOpacity
+                onPress={() => setShowInviteModal(false)}
+                style={styles.modalCloseButton}
+              >
+                <Ionicons name="close" size={24} color="#2E2C55" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.qrCodeContainer}>
+              <QRCode
+                value={`https://trinkkartell.app/invite/${inviteCode}`}
+                size={200}
+                color="#2E2C55"
+                backgroundColor="#fff"
+              />
+            </View>
+            
+            <View style={styles.inviteCodeContainer}>
+              <Text style={styles.inviteCodeLabel}>Einladungscode:</Text>
+              <Text style={styles.inviteCodeText}>{inviteCode}</Text>
+            </View>
+            
+            <TouchableOpacity
+              style={styles.shareButton}
+              onPress={shareInviteLink}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="share-outline" size={20} color="#fff" />
+              <Text style={styles.shareButtonText}>Einladung schicken</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -527,6 +703,21 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '500',
   },
+  contactRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    paddingVertical: 4,
+  },
+  contactText: {
+    fontSize: 14,
+    color: '#2E2C55',
+    fontWeight: '500',
+  },
+  addressContainer: {
+    flex: 1,
+  },
   phoneRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -539,15 +730,27 @@ const styles = StyleSheet.create({
   actionButtons: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 8,
+    marginTop: 12,
   },
   actionButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    flex: 1,
+    borderRadius: 12,
     backgroundColor: '#f5f5f5',
-    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  actionButtonContent: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  actionButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2E2C55',
   },
   statRow: {
     flexDirection: 'row',
@@ -616,6 +819,104 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: '#2E2C55',
+  },
+  showAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+  },
+  showAllButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2E2C55',
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 24,
+    width: '85%',
+    maxWidth: 400,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#2E2C55',
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  qrCodeContainer: {
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  inviteCodeContainer: {
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  inviteCodeLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 8,
+  },
+  inviteCodeText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#2E2C55',
+    letterSpacing: 2,
+  },
+  shareButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#2E2C55',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    width: '100%',
+    gap: 8,
+  },
+  shareButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
   },
 });
 

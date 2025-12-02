@@ -16,8 +16,56 @@ import OrderDetailScreen from './screens/OrderDetailScreen';
 import SalesAppScreen from './screens/SalesAppScreen';
 import CustomerScreen from './screens/CustomerScreen';
 import CustomerDetailScreen from './screens/CustomerDetailScreen';
+import CustomerChatScreen from './screens/CustomerChatScreen';
 import AddCustomerScreen from './screens/AddCustomerScreen';
 import OrdersScreen from './screens/OrdersScreen';
+
+// Generiere Dummy-Items für Bestellungen ohne Items
+const generateDummyItems = (count: number) => {
+  const dummyItems: Array<{ name: string; quantity: number; unit: string }> = [];
+  
+  // Sammle alle Produkte aus productData
+  const allProducts: Array<{ Artikelname: string; unit_title?: string }> = [];
+  Object.values(productData).forEach((categoryProducts) => {
+    if (Array.isArray(categoryProducts)) {
+      categoryProducts.forEach(product => {
+        if (product && product.Artikelname && product.Artikelname.trim()) {
+          allProducts.push(product);
+        }
+      });
+    }
+  });
+  
+  // Wenn keine Produkte gefunden wurden, verwende Standard-Dummy-Items
+  if (allProducts.length === 0) {
+    const defaultItems = [
+      { name: 'Krombacher Pils', quantity: 2, unit: 'Kasten' },
+      { name: 'Warsteiner Premium Pils', quantity: 1, unit: 'Ki (20 Fl)' },
+      { name: 'Pyraser Weizen', quantity: 1, unit: 'Ki (20 Fl)' },
+      { name: 'Mönchshof Radler Blutorange', quantity: 1, unit: 'Ki' },
+      { name: 'Glüh Gin', quantity: 1, unit: 'Fl' },
+    ];
+    return defaultItems.slice(0, Math.min(count, defaultItems.length));
+  }
+  
+  // Wähle zufällige Produkte aus
+  const selectedProducts = allProducts
+    .sort(() => Math.random() - 0.5)
+    .slice(0, Math.min(count, allProducts.length));
+  
+  selectedProducts.forEach((product) => {
+    const quantity = Math.floor(Math.random() * 5) + 1; // 1-5 Stück
+    const unit = product.unit_title || 'Fl';
+    
+    dummyItems.push({
+      name: product.Artikelname.trim(),
+      quantity: quantity,
+      unit: unit,
+    });
+  });
+  
+  return dummyItems;
+};
 
 export default function App() {
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
@@ -43,9 +91,11 @@ export default function App() {
   const [showSalesApp, setShowSalesApp] = useState(false);
   const [showCustomerScreen, setShowCustomerScreen] = useState(false);
   const [showCustomerDetail, setShowCustomerDetail] = useState(false);
+  const [showCustomerChat, setShowCustomerChat] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
   const [showAddCustomerScreen, setShowAddCustomerScreen] = useState(false);
   const [showOrdersScreen, setShowOrdersScreen] = useState(false);
+  const [ordersSearchQuery, setOrdersSearchQuery] = useState('');
   const [shouldFocusSearch, setShouldFocusSearch] = useState(false);
   const [initialFilter, setInitialFilter] = useState<string | null>(null);
   const [initialActivityLevelFilter, setInitialActivityLevelFilter] = useState<string | null>(null);
@@ -340,7 +390,7 @@ export default function App() {
           }}
         />
       )}
-      {showCustomerScreen && !showAddCustomerScreen && !showCustomerDetail && (
+      {showCustomerScreen && !showAddCustomerScreen && (
         <CustomerScreen
           onBack={() => {
             setInitialActivityLevelFilter(null);
@@ -363,6 +413,85 @@ export default function App() {
             setShowCustomerDetail(false);
             setSelectedCustomer(null);
           }}
+          onShowAllOrders={(customerName) => {
+            setOrdersSearchQuery(customerName);
+            setShowCustomerDetail(false);
+            setSelectedCustomer(null);
+            setShowCustomerScreen(false);
+            setShowOrdersScreen(true);
+          }}
+          onChatPress={(customer) => {
+            setShowCustomerChat(true);
+          }}
+          onOrderPress={(order) => {
+            // Generiere fiktive Daten, falls Felder fehlen
+            const today = new Date();
+            const orderDate = new Date(today);
+            orderDate.setDate(orderDate.getDate() - Math.floor(Math.random() * 7)); // 0-7 Tage in der Vergangenheit
+            const deliveryDate = new Date(orderDate);
+            deliveryDate.setDate(deliveryDate.getDate() + 2); // 2 Tage später
+            
+            const formatDate = (date: Date) => {
+              const days = ['So.', 'Mo.', 'Di.', 'Mi.', 'Do.', 'Fr.', 'Sa.'];
+              const dayName = days[date.getDay()];
+              const day = String(date.getDate()).padStart(2, '0');
+              const month = String(date.getMonth() + 1).padStart(2, '0');
+              const year = String(date.getFullYear()).slice(-2);
+              return `${dayName} ${day}.${month}.${year}`;
+            };
+            
+            const formatDateWithTime = (date: Date) => {
+              const days = ['So.', 'Mo.', 'Di.', 'Mi.', 'Do.', 'Fr.', 'Sa.'];
+              const dayName = days[date.getDay()];
+              const day = String(date.getDate()).padStart(2, '0');
+              const month = String(date.getMonth() + 1).padStart(2, '0');
+              const year = String(date.getFullYear()).slice(-2);
+              const hours = String(date.getHours()).padStart(2, '0');
+              const minutes = String(date.getMinutes()).padStart(2, '0');
+              return `${dayName} ${day}.${month}.${year} ${hours}:${minutes}`;
+            };
+            
+            // Generiere fiktive Bestellnummer im Format "ORD YYYY-XXX"
+            const generateOrderNumber = () => {
+              const year = today.getFullYear();
+              const orderNum = Math.floor(Math.random() * 999) + 1;
+              return `ORD ${year}-${String(orderNum).padStart(3, '0')}`;
+            };
+            
+            // Stelle sicher, dass alle Felder vorhanden sind (auch wenn leer)
+            const orderWithItems = {
+              ...order,
+              orderDate: (order.orderDate && order.orderDate.trim()) || (order.orderDateRaw && order.orderDateRaw.trim()) || formatDateWithTime(orderDate),
+              deliveryDate: (order.deliveryDate && order.deliveryDate.trim()) || formatDate(deliveryDate),
+              orderNumber: (order.orderNumber && order.orderNumber.trim()) || generateOrderNumber(),
+              email: (order.email && order.email.trim()) || `${(order.customer || 'kunde').toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '')}@example.com`,
+              fromAddress: order.fromAddress || {
+                name: 'Trinkkartell GmbH',
+                street: 'Industriestraße 78',
+                city: '97074 Würzburg',
+                country: 'Deutschland'
+              },
+              toAddress: order.toAddress || {
+                name: order.customer || 'Kunde',
+                street: 'Hauptstraße 12',
+                city: '97070 Würzburg',
+                country: 'Deutschland'
+              },
+              items: order.items && order.items.length > 0 
+                ? order.items 
+                : generateDummyItems(order.itemCount ? parseInt(order.itemCount) : 5)
+            };
+            setSelectedOrder(orderWithItems);
+            setShowOrderDetail(true);
+          }}
+        />
+      )}
+      {showCustomerScreen && showCustomerChat && selectedCustomer && (
+        <CustomerChatScreen
+          customer={selectedCustomer}
+          onBack={() => {
+            setShowCustomerChat(false);
+          }}
         />
       )}
       {showAddCustomerScreen && (
@@ -377,14 +506,19 @@ export default function App() {
       )}
       {showOrdersScreen && (
         <OrdersScreen
-          onBack={() => setShowOrdersScreen(false)}
+          onBack={() => {
+            setShowOrdersScreen(false);
+            setOrdersSearchQuery('');
+          }}
           onOrderPress={(order) => {
             setSelectedOrder(order);
             setShowOrderDetail(true);
           }}
+          initialSearchQuery={ordersSearchQuery}
         />
       )}
-      {showOrdersScreen && showOrderDetail && selectedOrder && !showOrderHistory && (
+      {((showOrdersScreen && showOrderDetail && selectedOrder && !showOrderHistory) ||
+        (showCustomerScreen && showCustomerDetail && showOrderDetail && selectedOrder)) && (
         <OrderDetailScreen
           order={selectedOrder}
           onBack={() => {
@@ -551,7 +685,66 @@ export default function App() {
         <OrderHistoryScreen
           onBack={() => setShowOrderHistory(false)}
           onOrderPress={(order) => {
-            setSelectedOrder(order);
+            // Konvertiere OrderHistory-Format zu OrderDetail-Format
+            const today = new Date();
+            const orderDate = order.date ? new Date(order.date) : new Date(today);
+            const deliveryDate = new Date(orderDate);
+            deliveryDate.setDate(deliveryDate.getDate() + 2);
+            
+            const formatDate = (date: Date) => {
+              const days = ['So.', 'Mo.', 'Di.', 'Mi.', 'Do.', 'Fr.', 'Sa.'];
+              const dayName = days[date.getDay()];
+              const day = String(date.getDate()).padStart(2, '0');
+              const month = String(date.getMonth() + 1).padStart(2, '0');
+              const year = String(date.getFullYear()).slice(-2);
+              return `${dayName} ${day}.${month}.${year}`;
+            };
+            
+            const formatDateWithTime = (date: Date) => {
+              const days = ['So.', 'Mo.', 'Di.', 'Mi.', 'Do.', 'Fr.', 'Sa.'];
+              const dayName = days[date.getDay()];
+              const day = String(date.getDate()).padStart(2, '0');
+              const month = String(date.getMonth() + 1).padStart(2, '0');
+              const year = String(date.getFullYear()).slice(-2);
+              const hours = String(date.getHours()).padStart(2, '0');
+              const minutes = String(date.getMinutes()).padStart(2, '0');
+              return `${dayName} ${day}.${month}.${year} ${hours}:${minutes}`;
+            };
+            
+            // Konvertiere Items-Format
+            const convertedItems = order.items ? order.items.map((item: any) => ({
+              name: item.productName || item.name || 'Unbekanntes Produkt',
+              quantity: item.quantity || 0,
+              unit: item.unit || 'Fl'
+            })) : [];
+            
+            const convertedOrder = {
+              id: order.id || '',
+              customer: 'Trinkkartell GmbH',
+              orderDate: formatDateWithTime(orderDate),
+              orderDateRaw: formatDate(orderDate),
+              orderTime: String(orderDate.getHours()).padStart(2, '0') + ':' + String(orderDate.getMinutes()).padStart(2, '0'),
+              orderNumber: order.orderNumber || `ORD ${orderDate.getFullYear()}-${String(Math.floor(Math.random() * 999) + 1).padStart(3, '0')}`,
+              deliveryDate: formatDate(deliveryDate),
+              itemCount: String(convertedItems.length),
+              email: 'info@trinkkartell.de',
+              fromAddress: {
+                name: 'Trinkkartell GmbH',
+                street: 'Industriestraße 78',
+                city: '97074 Würzburg',
+                country: 'Deutschland'
+              },
+              toAddress: {
+                name: 'Trinkkartell GmbH',
+                street: 'Industriestraße 78',
+                city: '97074 Würzburg',
+                country: 'Deutschland'
+              },
+              items: convertedItems.length > 0 ? convertedItems : generateDummyItems(5),
+              cancelled: order.status === 'cancelled'
+            };
+            
+            setSelectedOrder(convertedOrder);
             setShowOrderDetail(true);
           }}
         />

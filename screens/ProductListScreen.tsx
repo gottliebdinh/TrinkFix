@@ -18,9 +18,12 @@ interface ProductListScreenProps {
   onSearchChange: (query: string) => void;
   onBack: () => void;
   favorites: Set<string>;
+  favoritesOrder: string[];
   cart: { [key: string]: number };
+  shoppingList?: { [key: string]: number };
   onToggleFavorite: (id: string) => void;
   onUpdateQuantity: (id: string, change: number) => void;
+  onUpdateShoppingListQuantity?: (id: string, change: number) => void;
   onHeaderCartPress?: () => void;
   shouldFocusSearch?: boolean;
   initialFilter?: string | null;
@@ -34,9 +37,12 @@ export default function ProductListScreen({
   onSearchChange,
   onBack,
   favorites,
+  favoritesOrder,
   cart,
+  shoppingList,
   onToggleFavorite,
   onUpdateQuantity,
+  onUpdateShoppingListQuantity,
   onHeaderCartPress,
   shouldFocusSearch = false,
   initialFilter = null,
@@ -51,6 +57,8 @@ export default function ProductListScreen({
     return new Set();
   });
   const [showFilterModal, setShowFilterModal] = useState(false);
+  const [snapshotFavoritesOrder, setSnapshotFavoritesOrder] = useState<string[]>([]);
+  const [snapshotFavorites, setSnapshotFavorites] = useState<Set<string>>(new Set());
   
   // Filtere "Alle Artikel" aus der Filterliste
   const filterCategories = useMemo(() => {
@@ -58,6 +66,10 @@ export default function ProductListScreen({
   }, []);
 
   useEffect(() => {
+    // Erstelle Snapshot der Favoriten-Reihenfolge beim Öffnen der Liste
+    setSnapshotFavoritesOrder([...favoritesOrder]);
+    setSnapshotFavorites(new Set(favorites));
+    
     // Animation beim Öffnen
     Animated.parallel([
       Animated.spring(translateY, {
@@ -79,7 +91,8 @@ export default function ProductListScreen({
         }, 100);
       }
     });
-  }, [shouldFocusSearch]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [category.id]); // Nur beim Öffnen einer neuen Kategorie
 
   const panResponder = useRef(
     PanResponder.create({
@@ -209,13 +222,45 @@ export default function ProductListScreen({
   }, [categoryFilteredProducts, selectedFilters]);
 
   // Filtere zusätzlich nach Suchanfrage
-  const filteredProducts = useMemo(() => {
+  const searchFilteredProducts = useMemo(() => {
     if (!searchQuery) return filterCategoryFilteredProducts;
     const lowerQuery = searchQuery.toLowerCase();
     return filterCategoryFilteredProducts.filter(p => 
       p.Artikelname?.toLowerCase().includes(lowerQuery)
     );
   }, [filterCategoryFilteredProducts, searchQuery]);
+
+  // Sortiere Produkte: Favoriten zuerst (basierend auf snapshotFavoritesOrder beim Öffnen)
+  const filteredProducts = useMemo(() => {
+    return searchFilteredProducts.sort((a, b) => {
+      const idA = a.data_id || a.Artikelname;
+      const idB = b.data_id || b.Artikelname;
+      const isFavoriteA = snapshotFavorites.has(idA);
+      const isFavoriteB = snapshotFavorites.has(idB);
+      
+      // Wenn beide Favoriten sind, sortiere nach snapshotFavoritesOrder
+      if (isFavoriteA && isFavoriteB) {
+        const indexA = snapshotFavoritesOrder.indexOf(idA);
+        const indexB = snapshotFavoritesOrder.indexOf(idB);
+        // Wenn beide in der Reihenfolge sind, sortiere nach Index
+        if (indexA !== -1 && indexB !== -1) {
+          return indexA - indexB;
+        }
+        // Wenn nur A in der Reihenfolge ist, kommt A zuerst
+        if (indexA !== -1) return -1;
+        // Wenn nur B in der Reihenfolge ist, kommt B zuerst
+        if (indexB !== -1) return 1;
+        // Wenn keiner in der Reihenfolge ist, behalte die ursprüngliche Reihenfolge
+        return 0;
+      }
+      // Wenn nur A ein Favorit ist, kommt A zuerst
+      if (isFavoriteA) return -1;
+      // Wenn nur B ein Favorit ist, kommt B zuerst
+      if (isFavoriteB) return 1;
+      // Wenn keiner ein Favorit ist, behalte die ursprüngliche Reihenfolge
+      return 0;
+    });
+  }, [searchFilteredProducts, snapshotFavorites, snapshotFavoritesOrder]);
 
   const toggleFilter = (categoryId: string) => {
     setSelectedFilters(prev => {

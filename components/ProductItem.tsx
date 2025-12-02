@@ -9,6 +9,11 @@ interface ProductItemProps {
   isFavorite: boolean;
   onToggleFavorite: (id: string) => void;
   onUpdateQuantity: (id: string, change: number) => void;
+  showDeleteButton?: boolean;
+  onDelete?: (id: string) => void;
+  showCommentButton?: boolean;
+  onCommentPress?: (id: string) => void;
+  hasComment?: boolean;
 }
 
 export default function ProductItem({
@@ -17,6 +22,11 @@ export default function ProductItem({
   isFavorite,
   onToggleFavorite,
   onUpdateQuantity,
+  showDeleteButton = false,
+  onDelete,
+  showCommentButton = false,
+  onCommentPress,
+  hasComment = false,
 }: ProductItemProps) {
   const id = item.data_id || item.Artikelname;
 
@@ -128,17 +138,48 @@ export default function ProductItem({
           <Text style={styles.productName} numberOfLines={2}>
             {item.Artikelname}
           </Text>
-          <TouchableOpacity 
-            onPress={() => onToggleFavorite(id)}
-            style={styles.favoriteButton}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Ionicons 
-              name={isFavorite ? "heart" : "heart-outline"} 
-              size={22} 
-              color={isFavorite ? "#FF3B30" : "#999"} 
-            />
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            {showCommentButton && (
+              <TouchableOpacity 
+                onPress={() => onCommentPress && onCommentPress(id)}
+                style={styles.commentButton}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons 
+                  name={hasComment ? "pencil" : "pencil-outline"} 
+                  size={24} 
+                  color={hasComment ? "#2E2C55" : "#666"} 
+                />
+              </TouchableOpacity>
+            )}
+            {showDeleteButton && onDelete ? (
+              <TouchableOpacity 
+                onPress={() => onDelete(id)}
+                style={styles.favoriteButton}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons 
+                  name="trash-outline" 
+                  size={22} 
+                  color="#FF3B30" 
+                />
+              </TouchableOpacity>
+            ) : (
+              !showCommentButton && (
+                <TouchableOpacity 
+                  onPress={() => onToggleFavorite(id)}
+                  style={styles.favoriteButton}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons 
+                    name={isFavorite ? "heart" : "heart-outline"} 
+                    size={22} 
+                    color={isFavorite ? "#FF3B30" : "#999"} 
+                  />
+                </TouchableOpacity>
+              )
+            )}
+          </View>
         </View>
         <View style={styles.productTypeRow}>
           <Text style={styles.productType}>
@@ -222,8 +263,17 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 8,
   },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   favoriteButton: {
     padding: 4,
+    marginLeft: 8,
+  },
+  commentButton: {
+    padding: 4,
+    backgroundColor: 'transparent',
   },
   productTypeRow: {
     flexDirection: 'row',

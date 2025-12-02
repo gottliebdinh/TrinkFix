@@ -15,8 +15,11 @@ interface HomeScreenProps {
   onSearchChange: (query: string) => void;
   onFavoritesPress?: () => void;
   onCartPress?: () => void;
+  onShoppingListPress?: () => void;
+  onChatPress?: () => void;
   favoritesCount?: number;
   cartCount?: number;
+  shoppingListCount?: number;
   onHeaderCartPress?: () => void;
   onSearchFocus?: () => void;
   isProductListOpen?: boolean;
@@ -70,8 +73,11 @@ export default function HomeScreen({
   onSearchChange,
   onFavoritesPress,
   onCartPress,
+  onShoppingListPress,
+  onChatPress,
   favoritesCount = 0,
   cartCount = 0,
+  shoppingListCount = 0,
   onHeaderCartPress,
   onSearchFocus,
   isProductListOpen = false,
@@ -100,16 +106,16 @@ export default function HomeScreen({
         
         <TouchableOpacity 
           style={styles.quickAccessItem}
-          onPress={onCartPress}
+          onPress={onShoppingListPress}
           activeOpacity={0.7}
         >
           <View style={styles.quickAccessIconContainer}>
             <Ionicons name="bag" size={28} color="#2E2C55" />
           </View>
           <Text style={styles.quickAccessLabel}>Einkaufsliste</Text>
-          {cartCount > 0 && (
+          {shoppingListCount > 0 && (
             <View style={styles.quickAccessBadge}>
-              <Text style={styles.quickAccessBadgeText}>{cartCount}</Text>
+              <Text style={styles.quickAccessBadgeText}>{shoppingListCount}</Text>
             </View>
           )}
         </TouchableOpacity>
@@ -179,8 +185,9 @@ export default function HomeScreen({
       <TouchableOpacity 
         style={styles.chatButton}
         onPress={() => {
-          // TODO: Open chat
-          console.log('Chat öffnen');
+          if (onChatPress) {
+            onChatPress();
+          }
         }}
         activeOpacity={0.7}
       >

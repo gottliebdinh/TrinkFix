@@ -53,6 +53,16 @@ export default function ProductItem({
       bottlesPerUnit = parseInt(kiMatch[1], 10);
       unitLabel = 'Fl';
     }
+    // Prüfe auf "Ki" ohne Klammer - zeige als "Ki", nicht als "Fl"
+    else if (unitTitle.match(/^Ki$/i) || unitValue === 'ki') {
+      bottlesPerUnit = 1;
+      unitLabel = 'Ki';
+    }
+    // Prüfe auf "Kasten" ohne Klammer - zeige als "Kasten", nicht als "Fl"
+    else if (unitTitle.match(/^Kasten$/i) || unitValue === 'kasten') {
+      bottlesPerUnit = 1;
+      unitLabel = 'Kasten';
+    }
     // Prüfe auf "Krt (X Fl)" Format
     else if (unitTitle.match(/Krt\s*\((\d+)\s*Fl\)/i)) {
       const krtMatch = unitTitle.match(/Krt\s*\((\d+)\s*Fl\)/i);

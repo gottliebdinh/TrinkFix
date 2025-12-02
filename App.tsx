@@ -10,6 +10,13 @@ import CartScreen from './screens/CartScreen';
 import CheckoutScreen from './screens/CheckoutScreen';
 import ChatScreen from './screens/ChatScreen';
 import ShoppingListScreen from './screens/ShoppingListScreen';
+import OffersScreen from './screens/OffersScreen';
+import OrderHistoryScreen from './screens/OrderHistoryScreen';
+import OrderDetailScreen from './screens/OrderDetailScreen';
+import SalesAppScreen from './screens/SalesAppScreen';
+import CustomerScreen from './screens/CustomerScreen';
+import AddCustomerScreen from './screens/AddCustomerScreen';
+import OrdersScreen from './screens/OrdersScreen';
 
 export default function App() {
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
@@ -28,6 +35,14 @@ export default function App() {
   const [showShoppingListProductView, setShowShoppingListProductView] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
   const [showChat, setShowChat] = useState(false);
+  const [showOffers, setShowOffers] = useState(false);
+  const [showOrderHistory, setShowOrderHistory] = useState(false);
+  const [showOrderDetail, setShowOrderDetail] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [showSalesApp, setShowSalesApp] = useState(false);
+  const [showCustomerScreen, setShowCustomerScreen] = useState(false);
+  const [showAddCustomerScreen, setShowAddCustomerScreen] = useState(false);
+  const [showOrdersScreen, setShowOrdersScreen] = useState(false);
   const [shouldFocusSearch, setShouldFocusSearch] = useState(false);
   const [initialFilter, setInitialFilter] = useState<string | null>(null);
 
@@ -260,7 +275,8 @@ export default function App() {
   return (
     <>
       <StatusBar style="auto" />
-      <HomeScreen
+      {!showSalesApp && (
+        <HomeScreen
         categories={updatedCategories}
         onCategoryPress={handleCategoryPress}
         searchQuery={searchQuery}
@@ -282,10 +298,62 @@ export default function App() {
         onChatPress={() => {
           setShowChat(true);
         }}
+        onOffersPress={() => {
+          setShowOffers(true);
+        }}
+        onOrderHistoryPress={() => {
+          setShowOrderHistory(true);
+        }}
+        onSalesAppPress={() => {
+          setShowSalesApp(true);
+        }}
         favoritesCount={favorites.size}
         cartCount={Object.keys(cart).length}
         shoppingListCount={Object.keys(shoppingList).length}
-      />
+        />
+      )}
+      {showSalesApp && !showCustomerScreen && !showOrdersScreen && (
+        <SalesAppScreen
+          onBack={() => setShowSalesApp(false)}
+          onCustomerPress={() => {
+            setShowCustomerScreen(true);
+          }}
+          onOrdersPress={() => {
+            setShowOrdersScreen(true);
+          }}
+          onChatPress={() => {
+            // TODO: Navigate to chat screen
+            console.log('Chat pressed');
+          }}
+          onInactiveCustomersPress={() => {
+            // TODO: Navigate to inactive customers screen
+            console.log('Inactive customers pressed');
+          }}
+        />
+      )}
+      {showCustomerScreen && !showAddCustomerScreen && (
+        <CustomerScreen
+          onBack={() => setShowCustomerScreen(false)}
+          onAddCustomer={() => {
+            setShowAddCustomerScreen(true);
+          }}
+        />
+      )}
+      {showAddCustomerScreen && (
+        <AddCustomerScreen
+          onBack={() => setShowAddCustomerScreen(false)}
+          onSave={(customerData) => {
+            // TODO: Save customer data
+            console.log('Customer saved:', customerData);
+            setShowAddCustomerScreen(false);
+          }}
+        />
+      )}
+      {showOrdersScreen && (
+        <OrdersScreen
+          onBack={() => setShowOrdersScreen(false)}
+        />
+      )}
       {/* FavoritesScreen als Overlay über HomeScreen */}
       {showFavorites && (
         <FavoritesScreen
@@ -318,7 +386,7 @@ export default function App() {
           onCheckout={() => {
             setShowCheckout(true);
           }}
-          zIndex={showShoppingList ? 1100 : 1000}
+          zIndex={showShoppingList ? 1100 : showOffers ? 1100 : 1000}
         />
       )}
       {/* CheckoutScreen als Overlay über CartScreen */}
@@ -332,7 +400,7 @@ export default function App() {
           onBack={() => {
             setShowCheckout(false);
           }}
-          zIndex={showShoppingList ? 1200 : 1001}
+          zIndex={showShoppingList ? 1200 : showOffers ? 1200 : 1001}
         />
       )}
       {/* ProductListScreen als Overlay über HomeScreen */}
@@ -367,6 +435,21 @@ export default function App() {
       {showChat && (
         <ChatScreen
           onBack={() => setShowChat(false)}
+        />
+      )}
+      {/* OffersScreen als Overlay über HomeScreen */}
+      {showOffers && (
+        <OffersScreen
+          onBack={() => setShowOffers(false)}
+          favorites={favorites}
+          onToggleFavorite={toggleFavorite}
+          cart={cart}
+          onUpdateQuantity={updateQuantity}
+          shoppingList={shoppingList}
+          onUpdateShoppingListQuantity={updateShoppingListQuantity}
+          onHeaderCartPress={() => {
+            setShowCart(true);
+          }}
         />
       )}
       {/* ShoppingListScreen als Overlay über HomeScreen */}
@@ -422,6 +505,26 @@ export default function App() {
           initialFilter={null}
           shoppingListMode={true}
           zIndex={1001}
+        />
+      )}
+      {/* OrderHistoryScreen als Overlay über HomeScreen */}
+      {showOrderHistory && (
+        <OrderHistoryScreen
+          onBack={() => setShowOrderHistory(false)}
+          onOrderPress={(order) => {
+            setSelectedOrder(order);
+            setShowOrderDetail(true);
+          }}
+        />
+      )}
+      {/* OrderDetailScreen als Overlay über OrderHistoryScreen */}
+      {showOrderDetail && selectedOrder && (
+        <OrderDetailScreen
+          order={selectedOrder}
+          onBack={() => {
+            setShowOrderDetail(false);
+            setSelectedOrder(null);
+          }}
         />
       )}
     </>

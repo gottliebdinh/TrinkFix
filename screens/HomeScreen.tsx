@@ -1,11 +1,11 @@
-import React, { useMemo, useCallback } from 'react';
-import { StyleSheet, Text, View, FlatList, TouchableOpacity, SafeAreaView, Image, TextInput, Dimensions } from 'react-native';
+import React, { useMemo, useCallback, useState, useRef, useEffect } from 'react';
+import { StyleSheet, Text, View, FlatList, TouchableOpacity, SafeAreaView, Image, TextInput, Dimensions, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Category } from '../types';
 import { categoryImages } from '../data/categoryImages';
 
-const { width } = Dimensions.get('window');
+const { width, width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = (width - 32) / 2; // 2 Spalten mit 12px Padding auf jeder Seite + 8px Abstand zwischen Karten
 
 interface HomeScreenProps {
@@ -17,6 +17,9 @@ interface HomeScreenProps {
   onCartPress?: () => void;
   onShoppingListPress?: () => void;
   onChatPress?: () => void;
+  onOffersPress?: () => void;
+  onOrderHistoryPress?: () => void;
+  onSalesAppPress?: () => void;
   favoritesCount?: number;
   cartCount?: number;
   shoppingListCount?: number;
@@ -75,6 +78,9 @@ export default function HomeScreen({
   onCartPress,
   onShoppingListPress,
   onChatPress,
+  onOffersPress,
+  onOrderHistoryPress,
+  onSalesAppPress,
   favoritesCount = 0,
   cartCount = 0,
   shoppingListCount = 0,
@@ -82,6 +88,45 @@ export default function HomeScreen({
   onSearchFocus,
   isProductListOpen = false,
 }: HomeScreenProps) {
+  const [showSidebar, setShowSidebar] = useState(false);
+  const sidebarTranslateX = useRef(new Animated.Value(-SCREEN_WIDTH * 0.8)).current;
+  const sidebarOverlayOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (showSidebar) {
+      Animated.parallel([
+        Animated.spring(sidebarTranslateX, {
+          toValue: 0,
+          useNativeDriver: true,
+          tension: 50,
+          friction: 10,
+        }),
+        Animated.timing(sidebarOverlayOpacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.spring(sidebarTranslateX, {
+          toValue: -SCREEN_WIDTH * 0.8,
+          useNativeDriver: true,
+          tension: 50,
+          friction: 10,
+        }),
+        Animated.timing(sidebarOverlayOpacity, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [showSidebar]);
+
+  const closeSidebar = () => {
+    setShowSidebar(false);
+  };
 
   const renderCategoryItem = useCallback(({ item }: { item: Category }) => (
     <CategoryItem category={item} onPress={onCategoryPress} />
@@ -91,6 +136,18 @@ export default function HomeScreen({
 
   const ListHeader = useMemo(() => (
     <>
+      {/* KartellDeals Sektion */}
+      <TouchableOpacity 
+        style={styles.dealsContainer}
+        onPress={onOffersPress}
+        activeOpacity={0.8}
+      >
+        <Image
+          source={require('../assets/events/KartellDeals.jpeg')}
+          style={styles.dealsImage}
+          resizeMode="cover"
+        />
+      </TouchableOpacity>
       <Text style={styles.sectionTitle}>Schnellzugriff</Text>
       <View style={styles.quickAccessContainer}>
         <TouchableOpacity 
@@ -110,7 +167,7 @@ export default function HomeScreen({
           activeOpacity={0.7}
         >
           <View style={styles.quickAccessIconContainer}>
-            <Ionicons name="bag" size={28} color="#2E2C55" />
+            <Ionicons name="list" size={28} color="#2E2C55" />
           </View>
           <Text style={styles.quickAccessLabel}>Einkaufsliste</Text>
         </TouchableOpacity>
@@ -124,6 +181,13 @@ export default function HomeScreen({
       <View style={styles.header}>
         <SafeAreaView style={styles.safeAreaTop}>
           <View style={styles.headerTopRow}>
+            <TouchableOpacity 
+              style={styles.menuButton}
+              onPress={() => setShowSidebar(true)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="menu" size={28} color="#2E2C55" />
+            </TouchableOpacity>
             <View style={styles.logoContainer}>
               <View style={styles.logoTextContainer}>
                 <Text style={styles.logoText}>TRINKKARTELL</Text>
@@ -188,7 +252,90 @@ export default function HomeScreen({
       >
         <Ionicons name="chatbubble" size={24} color="#2E2C55" />
       </TouchableOpacity>
-    </View>
+      
+      {/* Sidebar Overlay */}
+      {showSidebar && (
+      <>
+        <Animated.View 
+          style={[
+            styles.sidebarOverlay,
+            {
+              opacity: sidebarOverlayOpacity,
+            }
+          ]}
+        >
+          <TouchableOpacity 
+            style={styles.sidebarOverlayTouchable}
+            activeOpacity={1}
+            onPress={closeSidebar}
+          />
+        </Animated.View>
+        <Animated.View 
+          style={[
+            styles.sidebar,
+            {
+              transform: [{ translateX: sidebarTranslateX }],
+            }
+          ]}
+        >
+          <View style={styles.sidebarHeader}>
+            <Text style={styles.sidebarTitle}>Menü</Text>
+            <TouchableOpacity 
+              onPress={closeSidebar}
+              style={styles.sidebarCloseButton}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="close" size={24} color="#2E2C55" />
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.sidebarContent}>
+              <TouchableOpacity 
+                style={styles.sidebarItem}
+                onPress={() => {
+                  closeSidebar();
+                  if (onOrderHistoryPress) {
+                    onOrderHistoryPress();
+                  }
+                }}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="time-outline" size={24} color="#2E2C55" />
+                <Text style={styles.sidebarItemText}>Bestellhistorie</Text>
+              </TouchableOpacity>
+            
+              <TouchableOpacity 
+                style={styles.sidebarItem}
+                onPress={() => {
+                  closeSidebar();
+                  if (onSalesAppPress) {
+                    onSalesAppPress();
+                  }
+                }}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="business-outline" size={24} color="#2E2C55" />
+                <Text style={styles.sidebarItemText}>Zur Vertriebsapp</Text>
+              </TouchableOpacity>
+          </View>
+          
+          <View style={styles.sidebarFooter}>
+            <TouchableOpacity 
+              style={styles.sidebarItem}
+              onPress={() => {
+                closeSidebar();
+                // TODO: Navigate to settings
+              }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="settings-outline" size={24} color="#2E2C55" />
+              <Text style={styles.sidebarItemText}>Einstellungen</Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      </>
+    )}
+  </View>
   );
 }
 
@@ -443,6 +590,92 @@ const styles = StyleSheet.create({
     elevation: 5,
     borderWidth: 2,
     borderColor: '#2E2C55',
+  },
+  dealsContainer: {
+    marginBottom: 24,
+    marginTop: 8,
+    paddingHorizontal: 4,
+  },
+  dealsImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 12,
+    backgroundColor: '#f5f5f5',
+  },
+  menuButton: {
+    position: 'absolute',
+    left: 20,
+    padding: 4,
+    zIndex: 10,
+  },
+  sidebarOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    zIndex: 999,
+  },
+  sidebarOverlayTouchable: {
+    flex: 1,
+  },
+  sidebar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: SCREEN_WIDTH * 0.8,
+    height: '100%',
+    backgroundColor: '#fff',
+    zIndex: 1000,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 2,
+      height: 0,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  sidebarHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  sidebarTitle: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#2E2C55',
+  },
+  sidebarCloseButton: {
+    padding: 4,
+  },
+  sidebarContent: {
+    flex: 1,
+    paddingTop: 20,
+  },
+  sidebarFooter: {
+    paddingBottom: 40,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+    paddingTop: 20,
+  },
+  sidebarItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  sidebarItemText: {
+    fontSize: 16,
+    color: '#2E2C55',
+    marginLeft: 16,
+    fontWeight: '500',
   },
 });
 

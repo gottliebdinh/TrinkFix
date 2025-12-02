@@ -76,13 +76,14 @@ export default function ProductListScreen({
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: (evt, gestureState) => {
-        // Nur am oberen Bereich (Header) reagieren
-        return gestureState.y0 < 100;
+        // Nur am oberen Bereich (Header/DragHandle) reagieren
+        return gestureState.y0 < 80;
       },
       onMoveShouldSetPanResponder: (evt, gestureState) => {
-        // Nur nach unten ziehen
-        return gestureState.dy > 0 && gestureState.y0 < 100;
+        // Nur nach unten ziehen und nur im oberen Bereich
+        return gestureState.dy > 5 && gestureState.y0 < 80;
       },
+      onPanResponderTerminationRequest: () => false,
       onPanResponderMove: (evt, gestureState) => {
         // Nur nach unten ziehen erlauben
         if (gestureState.dy > 0) {
@@ -264,12 +265,11 @@ export default function ProductListScreen({
             transform: [{ translateY: translateY }],
           }
         ]}
-        {...panResponder.panHandlers}
       >
-        <SafeAreaView style={styles.safeArea}>
+        <View style={styles.safeArea}>
           <StatusBar style="auto" />
-          <View style={styles.dragHandle} />
-          <View style={styles.header}>
+          <View style={styles.dragHandle} {...panResponder.panHandlers} />
+          <View style={styles.header} {...panResponder.panHandlers}>
           <View style={styles.headerTopRow}>
           <TouchableOpacity onPress={closeOverlay} style={styles.backButton}>
             <Ionicons name="chevron-back" size={24} color="#2E2C55" />
@@ -353,14 +353,16 @@ export default function ProductListScreen({
           renderItem={renderProductItem}
           keyExtractor={(item, index) => item.data_id || index.toString()}
           contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
+          showsVerticalScrollIndicator={true}
           initialNumToRender={10}
           maxToRenderPerBatch={10}
           windowSize={5}
-          removeClippedSubviews={true}
+          removeClippedSubviews={false}
+          nestedScrollEnabled={true}
+          style={styles.flatList}
         />
               )}
-            </SafeAreaView>
+            </View>
           </Animated.View>
           
           {/* Filter Modal */}
@@ -470,6 +472,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -481,6 +484,7 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
+    backgroundColor: '#f5f5f5',
   },
   dragHandle: {
     width: 40,
@@ -561,9 +565,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  flatList: {
+    flex: 1,
+  },
   listContent: {
     padding: 16,
-    paddingBottom: 40,
+    paddingBottom: 0,
   },
   filterContainer: {
     flexDirection: 'row',

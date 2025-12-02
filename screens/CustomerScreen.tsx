@@ -19,10 +19,10 @@ interface CustomerScreenProps {
   onAddCustomer?: () => void;
   initialActivityLevel?: string | null;
   onCustomerPress?: (customer: Customer) => void;
+  newCustomers?: Customer[];
 }
 
-// Kundendaten aus CSV importiert
-const MOCK_CUSTOMERS: Customer[] = customersData as Customer[];
+// Kundendaten aus CSV importiert - wird in der Komponente mit newCustomers kombiniert
 
 const ACTIVITY_LEVELS = ['aktiv', 'ruhend', 'inaktiv', 'passiv'];
 const CUSTOMER_STATUSES = [
@@ -43,6 +43,7 @@ export default function CustomerScreen({
   onAddCustomer,
   initialActivityLevel,
   onCustomerPress,
+  newCustomers = [],
 }: CustomerScreenProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -54,6 +55,12 @@ export default function CustomerScreen({
   const [selectedArea, setSelectedArea] = useState<string | null>(null);
   const [selectedPrice, setSelectedPrice] = useState<string | null>(null);
   const [selectedCountry, setSelectedCountry] = useState<string>('');
+  
+  // Kombiniere CSV-Kunden mit neuen Kunden
+  const allCustomers = useMemo(() => {
+    const csvCustomers = (customersData as Customer[]);
+    return [...newCustomers, ...csvCustomers];
+  }, [newCustomers]);
 
   const toggleFilter = (filterSet: Set<string>, setFilterSet: (set: Set<string>) => void, value: string) => {
     const newSet = new Set(filterSet);
@@ -150,7 +157,7 @@ export default function CustomerScreen({
 
   // Filtere Kunden basierend auf Suchanfrage und Filtern
   const filteredCustomers = useMemo(() => {
-    let filtered = MOCK_CUSTOMERS;
+    let filtered = allCustomers;
 
     // Suche
     if (searchQuery.trim()) {

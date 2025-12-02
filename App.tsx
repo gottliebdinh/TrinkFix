@@ -19,6 +19,7 @@ import CustomerDetailScreen from './screens/CustomerDetailScreen';
 import CustomerChatScreen from './screens/CustomerChatScreen';
 import AddCustomerScreen from './screens/AddCustomerScreen';
 import OrdersScreen from './screens/OrdersScreen';
+import ChatsOverviewScreen from './screens/ChatsOverviewScreen';
 
 // Generiere Dummy-Items für Bestellungen ohne Items
 const generateDummyItems = (count: number) => {
@@ -95,6 +96,11 @@ export default function App() {
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
   const [showAddCustomerScreen, setShowAddCustomerScreen] = useState(false);
   const [showOrdersScreen, setShowOrdersScreen] = useState(false);
+  const [showChatsOverview, setShowChatsOverview] = useState(false);
+  const [chatMessages, setChatMessages] = useState<{[key: string]: Array<{id: string; sender: 'customer' | 'user'; text: string; timestamp: Date}>}>({});
+  const [readChats, setReadChats] = useState<Set<string>>(new Set());
+  const [unansweredChats, setUnansweredChats] = useState<Set<string>>(new Set());
+  const [newCustomers, setNewCustomers] = useState<any[]>([]);
   const [ordersSearchQuery, setOrdersSearchQuery] = useState('');
   const [shouldFocusSearch, setShouldFocusSearch] = useState(false);
   const [initialFilter, setInitialFilter] = useState<string | null>(null);
@@ -366,7 +372,7 @@ export default function App() {
         shoppingListCount={Object.keys(shoppingList).length}
         />
       )}
-      {showSalesApp && !showCustomerScreen && !showOrdersScreen && (
+      {showSalesApp && !showCustomerScreen && !showOrdersScreen && !showChatsOverview && (
         <SalesAppScreen
           onBack={() => setShowSalesApp(false)}
           onCustomerPress={() => {
@@ -381,8 +387,7 @@ export default function App() {
             setShowOrdersScreen(true);
           }}
           onChatPress={() => {
-            // TODO: Navigate to chat screen
-            console.log('Chat pressed');
+            setShowChatsOverview(true);
           }}
           onInactiveCustomersPress={() => {
             // TODO: Navigate to inactive customers screen
@@ -400,6 +405,7 @@ export default function App() {
             setShowAddCustomerScreen(true);
           }}
           initialActivityLevel={initialActivityLevelFilter}
+          newCustomers={newCustomers}
           onCustomerPress={(customer) => {
             setSelectedCustomer(customer);
             setShowCustomerDetail(true);
@@ -486,11 +492,46 @@ export default function App() {
           }}
         />
       )}
-      {showCustomerScreen && showCustomerChat && selectedCustomer && (
+      {((showCustomerScreen && showCustomerChat) || (showSalesApp && showCustomerChat)) && selectedCustomer && (
         <CustomerChatScreen
           customer={selectedCustomer}
+          initialMessages={chatMessages[selectedCustomer.id]}
           onBack={() => {
             setShowCustomerChat(false);
+          }}
+          onMessageSent={(customerId, message) => {
+            setChatMessages(prev => {
+              const existingMessages = prev[customerId] || [];
+              // Prüfe, ob die Nachricht bereits existiert (verhindere Duplikate)
+              const messageExists = existingMessages.some(m => m.id === message.id);
+              if (messageExists) {
+                return prev;
+              }
+              return {
+                ...prev,
+                [customerId]: [...existingMessages, message],
+              };
+            });
+            // Entferne aus "unbeantwortet", da jetzt geantwortet wurde
+            setUnansweredChats(prev => {
+              const newSet = new Set(prev);
+              newSet.delete(customerId);
+              return newSet;
+            });
+            // Markiere als gelesen, da der Benutzer die letzte Nachricht geschrieben hat
+            setReadChats(prev => new Set(prev).add(customerId));
+          }}
+          onChatOpened={(customerId) => {
+            // Markiere Chat als gelesen beim Öffnen
+            setReadChats(prev => new Set(prev).add(customerId));
+            // Wenn letzte Nachricht vom Kunden ist, markiere als unbeantwortet
+            const messages = chatMessages[customerId];
+            if (messages && messages.length > 0) {
+              const lastMessage = messages[messages.length - 1];
+              if (lastMessage.sender === 'customer') {
+                setUnansweredChats(prev => new Set(prev).add(customerId));
+              }
+            }
           }}
         />
       )}
@@ -498,8 +539,37 @@ export default function App() {
         <AddCustomerScreen
           onBack={() => setShowAddCustomerScreen(false)}
           onSave={(customerData) => {
-            // TODO: Save customer data
-            console.log('Customer saved:', customerData);
+            // Erstelle neuen Kunden mit allen notwendigen Feldern
+            const newCustomer = {
+              id: `new-${Date.now()}`,
+              name: customerData.customerName || '',
+              type: 'restaurant' as const,
+              activityLevel: 'aktiv' as const,
+              status: 'Noch keine Bestellung',
+              group: customerData.selectedGroup || '',
+              country: customerData.countryCode || 'Deutschland',
+              phone: customerData.phoneNumber || '',
+              email: customerData.email || '',
+              toAddress: {
+                name: customerData.customerName || '',
+                street: customerData.street || '',
+                number: '',
+                postalCode: customerData.zipCode || '',
+                city: customerData.city || '',
+                country: customerData.countryCode || 'Deutschland',
+              },
+              averageOrderValue: 0,
+              orderFrequency: 'Unbekannt',
+              revenueYTD: 0,
+              salesRep: null,
+              deliveryDays: Array.from(customerData.deliveryDays || []),
+              pricesVisible: customerData.showPrices || false,
+              minOrderQuantity: parseInt(customerData.minOrderQuantity || '0', 10),
+              notificationsEnabled: false,
+            };
+            
+            // Füge neuen Kunden zur Liste hinzu
+            setNewCustomers(prev => [...prev, newCustomer]);
             setShowAddCustomerScreen(false);
           }}
         />
@@ -608,6 +678,41 @@ export default function App() {
       {showChat && (
         <ChatScreen
           onBack={() => setShowChat(false)}
+        />
+      )}
+      {/* ChatsOverviewScreen für Vertrieb */}
+      {showSalesApp && showChatsOverview && (
+        <ChatsOverviewScreen
+          onBack={() => setShowChatsOverview(false)}
+          savedMessages={chatMessages}
+          readChats={readChats}
+          unansweredChats={unansweredChats}
+          onChatRead={(customerId) => {
+            // Markiere Chat als gelesen
+            setReadChats(prev => new Set(prev).add(customerId));
+            // Wenn letzte Nachricht vom Kunden ist, markiere als unbeantwortet
+            const messages = chatMessages[customerId];
+            if (messages && messages.length > 0) {
+              const lastMessage = messages[messages.length - 1];
+              if (lastMessage.sender === 'customer') {
+                setUnansweredChats(prev => new Set(prev).add(customerId));
+              }
+            }
+          }}
+          onChatPress={(customer, messages) => {
+            setSelectedCustomer(customer);
+            // Speichere die Nachrichten für diesen Kunden, falls noch nicht vorhanden
+            setChatMessages(prev => {
+              if (!prev[customer.id]) {
+                return {
+                  ...prev,
+                  [customer.id]: messages,
+                };
+              }
+              return prev;
+            });
+            setShowCustomerChat(true);
+          }}
         />
       )}
       {/* OffersScreen als Overlay über HomeScreen */}

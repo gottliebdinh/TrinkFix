@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView, TextInput, KeyboardAvoidingView, Platform, Animated, PanResponder, Dimensions } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, ScrollView, TextInput, KeyboardAvoidingView, Platform, Animated, PanResponder, Dimensions, Keyboard } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -47,26 +47,69 @@ interface Customer {
   email?: string;
 }
 
+interface ChatMessage {
+  id: string;
+  sender: 'customer' | 'user';
+  text: string;
+  timestamp: Date;
+}
+
 interface CustomerChatScreenProps {
   customer: Customer;
   onBack: () => void;
+  initialMessages?: ChatMessage[];
+  onMessageSent?: (customerId: string, message: ChatMessage) => void;
+  onChatOpened?: (customerId: string) => void;
 }
 
 export default function CustomerChatScreen({
   customer,
   onBack,
+  initialMessages,
+  onMessageSent,
+  onChatOpened,
 }: CustomerChatScreenProps) {
   const [message, setMessage] = useState('');
-  const [messages, setMessages] = useState<Array<{ id: string; text: string; isUser: boolean; timestamp: Date; senderName?: string }>>([
-    {
-      id: 'trinkkartell-initial',
-      text: TRINKKARTELL_MESSAGE,
-      isUser: false,
-      timestamp: new Date(),
-      senderName: 'Trinkkartell',
-    },
-  ]);
+  
+  // Konvertiere initialMessages zu dem Format, das wir verwenden
+  // Der Benutzer ist Trinkkartell (Vertriebsmitarbeiter), der Kunde ist der andere
+  const convertMessages = (msgs?: ChatMessage[]) => {
+    if (!msgs || msgs.length === 0) {
+      return [
+        {
+          id: 'trinkkartell-initial',
+          text: TRINKKARTELL_MESSAGE,
+          isUser: true, // Trinkkartell (wir) schreibt rechts
+          timestamp: new Date(),
+          senderName: 'Trinkkartell',
+        },
+      ];
+    }
+    
+    return msgs.map(msg => ({
+      id: msg.id,
+      text: msg.text,
+      // 'user' bedeutet Trinkkartell (wir), 'customer' bedeutet der Kunde
+      isUser: msg.sender === 'user', // Trinkkartell schreibt rechts
+      timestamp: msg.timestamp,
+      senderName: msg.sender === 'user' ? 'Trinkkartell' : customer.name,
+    }));
+  };
+  
+  const [messages, setMessages] = useState<Array<{ id: string; text: string; isUser: boolean; timestamp: Date; senderName?: string }>>(
+    convertMessages(initialMessages)
+  );
   const scrollViewRef = useRef<ScrollView>(null);
+  
+  // Aktualisiere Nachrichten, wenn initialMessages sich ändert (z.B. wenn neue Nachrichten gesendet wurden)
+  useEffect(() => {
+    const converted = convertMessages(initialMessages);
+    setMessages(converted);
+    // Scrolle nach unten, wenn Nachrichten aktualisiert werden
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+  }, [initialMessages]);
   const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
@@ -85,6 +128,14 @@ export default function CustomerChatScreen({
       }),
     ]).start();
   }, []);
+  
+  useEffect(() => {
+    // Markiere Chat als geöffnet (nur einmal beim Mount)
+    if (onChatOpened) {
+      onChatOpened(customer.id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -93,6 +144,7 @@ export default function CustomerChatScreen({
   }, [messages]);
 
   const closeOverlay = () => {
+    Keyboard.dismiss();
     Animated.parallel([
       Animated.spring(translateY, {
         toValue: SCREEN_HEIGHT,
@@ -127,6 +179,7 @@ export default function CustomerChatScreen({
       },
       onPanResponderRelease: (evt, gestureState) => {
         if (gestureState.dy > 150) {
+          Keyboard.dismiss();
           Animated.parallel([
             Animated.spring(translateY, {
               toValue: SCREEN_HEIGHT,
@@ -166,11 +219,30 @@ export default function CustomerChatScreen({
       const newMessage = {
         id: Date.now().toString(),
         text: message.trim(),
-        isUser: true,
+        isUser: true, // Der Benutzer ist Trinkkartell (schreibt rechts)
         timestamp: new Date(),
-        senderName: 'Trinkkartell',
+        senderName: 'Trinkkartell', // Der Benutzer schreibt als Trinkkartell
       };
+      
+      // Füge Nachricht lokal hinzu
       setMessages(prev => [...prev, newMessage]);
+      
+      // Speichere die Nachricht für die Chat-Übersicht und persistiere sie
+      // 'user' bedeutet, dass Trinkkartell (der Benutzer) geschrieben hat
+      if (onMessageSent) {
+        onMessageSent(customer.id, {
+          id: newMessage.id,
+          sender: 'user', // Der Benutzer schreibt als Trinkkartell
+          text: newMessage.text,
+          timestamp: newMessage.timestamp,
+        });
+      }
+      
+      // Scrolle nach unten, wenn eine neue Nachricht gesendet wird
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+      
       setMessage('');
     }
   };
@@ -207,88 +279,86 @@ export default function CustomerChatScreen({
               <TouchableOpacity onPress={closeOverlay} style={styles.backButton}>
                 <Ionicons name="chevron-back" size={24} color="#2E2C55" />
               </TouchableOpacity>
-              <View style={styles.headerInfo}>
-                <Text style={styles.headerTitle}>{customer.name}</Text>
-                {customer.phone && (
-                  <Text style={styles.headerSubtitle}>{customer.phone}</Text>
-                )}
-              </View>
-              <View style={styles.placeholder} />
+              <Text style={styles.headerTitle}>{customer.name}</Text>
+              <View style={styles.headerSpacer} />
             </View>
           </View>
           
-          <KeyboardAvoidingView
-            style={styles.chatContainer}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-          >
+          <View style={styles.chatContainer}>
             <ScrollView
               ref={scrollViewRef}
-              style={styles.messagesContainer}
-              contentContainerStyle={styles.messagesContent}
+              style={styles.scrollView}
+              contentContainerStyle={styles.scrollContent}
               showsVerticalScrollIndicator={true}
+              keyboardShouldPersistTaps="handled"
             >
               {messages.map((msg) => (
                 <View
                   key={msg.id}
                   style={[
                     styles.messageContainer,
-                    msg.isUser ? styles.userMessageContainer : styles.customerMessageContainer,
+                    msg.isUser && styles.messageContainerRight
                   ]}
                 >
                   {msg.senderName && (
-                    <Text style={styles.messageSender}>{msg.senderName}</Text>
+                    <Text style={[
+                      styles.senderName,
+                      msg.isUser && styles.senderNameRight
+                    ]}>
+                      {msg.senderName}
+                    </Text>
                   )}
-                  <View
-                    style={[
-                      styles.messageBubble,
-                      msg.isUser ? styles.userMessage : styles.customerMessage,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.messageText,
-                        msg.isUser ? styles.userMessageText : styles.customerMessageText,
-                      ]}
-                    >
+                  <View style={[
+                    styles.messageBubble,
+                    msg.isUser && styles.messageBubbleRight
+                  ]}>
+                    <Text style={[
+                      styles.messageText,
+                      msg.isUser && styles.messageTextRight
+                    ]}>
                       {msg.text}
                     </Text>
-                    <Text
-                      style={[
-                        styles.messageTime,
-                        msg.isUser ? styles.userMessageTime : styles.customerMessageTime,
-                      ]}
-                    >
-                      {msg.timestamp.toLocaleTimeString('de-DE', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </Text>
                   </View>
+                  <Text style={[
+                    styles.messageTime,
+                    msg.isUser && styles.messageTimeRight
+                  ]}>
+                    {msg.timestamp.toLocaleTimeString('de-DE', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </Text>
                 </View>
               ))}
             </ScrollView>
             
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.input}
-                placeholder="Nachricht schreiben..."
-                placeholderTextColor="#999"
-                value={message}
-                onChangeText={setMessage}
-                multiline
-                maxLength={500}
-              />
-              <TouchableOpacity
-                style={[styles.sendButton, !message.trim() && styles.sendButtonDisabled]}
-                onPress={sendMessage}
-                disabled={!message.trim()}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="send" size={20} color={message.trim() ? "#fff" : "#ccc"} />
-              </TouchableOpacity>
-            </View>
-          </KeyboardAvoidingView>
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+              keyboardVerticalOffset={Platform.OS === 'ios' ? 110 : 0}
+            >
+              <View style={styles.inputContainer}>
+                <View style={styles.inputWrapper}>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Nachricht schreiben..."
+                    placeholderTextColor="#999"
+                    value={message}
+                    onChangeText={setMessage}
+                    multiline
+                    maxLength={500}
+                  />
+                </View>
+                <TouchableOpacity
+                  style={[styles.sendButton, !message.trim() && styles.sendButtonDisabled]}
+                  onPress={sendMessage}
+                  disabled={!message.trim()}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="send" size={20} color={message.trim() ? "#fff" : "#ccc"} />
+                </TouchableOpacity>
+              </View>
+            </KeyboardAvoidingView>
+          </View>
         </View>
       </Animated.View>
     </View>
@@ -297,34 +367,24 @@ export default function CustomerChatScreen({
 
 const styles = StyleSheet.create({
   overlayContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'flex-end',
+    backgroundColor: 'transparent',
     zIndex: 1200,
   },
   backdropTouchable: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    ...StyleSheet.absoluteFillObject,
   },
   backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   container: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: SCREEN_HEIGHT * 0.95,
     backgroundColor: '#f5f5f5',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     overflow: 'hidden',
+    height: SCREEN_HEIGHT * 0.95,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -354,14 +414,6 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
   },
   headerTopRow: {
     flexDirection: 'row',
@@ -371,136 +423,141 @@ const styles = StyleSheet.create({
   backButton: {
     padding: 4,
   },
-  headerInfo: {
-    flex: 1,
-    alignItems: 'center',
-  },
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#2E2C55',
+    flex: 1,
+    textAlign: 'center',
   },
-  headerSubtitle: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 2,
-  },
-  placeholder: {
+  headerSpacer: {
     width: 32,
   },
   chatContainer: {
     flex: 1,
+    justifyContent: 'flex-end',
   },
-  messagesContainer: {
+  scrollView: {
     flex: 1,
   },
-  messagesContent: {
-    padding: 16,
-    paddingBottom: 8,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 40,
-    minHeight: 200,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#999',
-    marginTop: 16,
-    textAlign: 'center',
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#999',
-    marginTop: 8,
-    textAlign: 'center',
+  scrollContent: {
+    padding: 20,
+    paddingBottom: 20,
+    flexGrow: 1,
   },
   messageContainer: {
-    marginBottom: 12,
-    maxWidth: '80%',
+    marginBottom: 20,
+    alignItems: 'flex-start',
   },
-  userMessageContainer: {
-    alignSelf: 'flex-end',
+  messageContainerRight: {
+    alignItems: 'flex-end',
   },
-  customerMessageContainer: {
-    alignSelf: 'flex-start',
-  },
-  messageSender: {
-    fontSize: 12,
-    color: '#999',
+  senderName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#2E2C55',
     marginBottom: 4,
-    marginLeft: 8,
+    marginLeft: 4,
+  },
+  senderNameRight: {
+    marginLeft: 0,
+    marginRight: 4,
   },
   messageBubble: {
-    maxWidth: '75%',
-    padding: 12,
-    borderRadius: 16,
-    marginBottom: 12,
-  },
-  userMessage: {
-    alignSelf: 'flex-end',
-    backgroundColor: '#2E2C55',
-    borderBottomRightRadius: 4,
-  },
-  customerMessage: {
-    alignSelf: 'flex-start',
     backgroundColor: '#fff',
-    borderBottomLeftRadius: 4,
+    borderRadius: 16,
+    padding: 16,
+    maxWidth: '85%',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
     borderWidth: 1,
     borderColor: '#e0e0e0',
   },
+  messageBubbleRight: {
+    backgroundColor: '#2E2C55',
+    borderColor: '#2E2C55',
+  },
   messageText: {
     fontSize: 15,
-    lineHeight: 20,
+    color: '#2E2C55',
+    lineHeight: 22,
   },
-  userMessageText: {
+  messageTextRight: {
     color: '#fff',
   },
-  customerMessageText: {
-    color: '#2E2C55',
-  },
   messageTime: {
-    fontSize: 11,
-    marginTop: 4,
-  },
-  userMessageTime: {
-    color: 'rgba(255, 255, 255, 0.7)',
-  },
-  customerMessageTime: {
+    fontSize: 12,
     color: '#999',
+    marginTop: 6,
+    marginLeft: 4,
+  },
+  messageTimeRight: {
+    marginLeft: 0,
+    marginRight: 4,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 24,
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
-    gap: 8,
+    gap: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: -2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  inputWrapper: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    minHeight: 48,
+    maxHeight: 120,
+    justifyContent: 'center',
   },
   input: {
     flex: 1,
-    maxHeight: 100,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 20,
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 12,
     fontSize: 15,
     color: '#2E2C55',
+    textAlignVertical: 'center',
   },
   sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: '#2E2C55',
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 3,
   },
   sendButtonDisabled: {
     backgroundColor: '#e0e0e0',
+    shadowOpacity: 0,
+    elevation: 0,
   },
 });
 

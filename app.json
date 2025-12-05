@@ -16,6 +16,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.trinkkartell.trinkfix",
       "displayName": "BestellKartell",
+      "icon": "./assets/logo.png",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }

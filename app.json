@@ -15,6 +15,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.trinkkartell.trinkfix",
+      "buildNumber": "2",
       "displayName": "BestellKartell",
       "icon": "./assets/logo.png",
       "infoPlist": {

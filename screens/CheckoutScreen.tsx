@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, TextInput, ScrollView, Animated, PanResponder, Dimensions, Keyboard, Modal } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, TextInput, ScrollView, Animated, PanResponder, Dimensions, Keyboard, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { Product } from '../types';
@@ -30,6 +30,9 @@ export default function CheckoutScreen({
 }: CheckoutScreenProps) {
   const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const opacity = useRef(new Animated.Value(0)).current;
+  const scrollViewRef = useRef<ScrollView>(null);
+  const noteInputRef = useRef<TextInput>(null);
+  const noteInputLayoutRef = useRef<{ y: number; height: number } | null>(null);
   const [deliveryType, setDeliveryType] = useState<'delivery' | 'pickup'>('delivery');
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -166,6 +169,31 @@ export default function CheckoutScreen({
     return dates;
   };
 
+  const handleNoteInputFocus = () => {
+    // Warte kurz, damit das Keyboard erscheint und das Layout berechnet werden kann
+    setTimeout(() => {
+      if (noteInputLayoutRef.current && scrollViewRef.current) {
+        const { y, height } = noteInputLayoutRef.current;
+        // Scrolle so, dass das Feld mit etwas Abstand über dem Keyboard liegt
+        // Keyboard-Höhe wird geschätzt (ca. 250-300px auf iOS)
+        const keyboardHeight = Platform.OS === 'ios' ? 300 : 250;
+        const visibleHeight = SCREEN_HEIGHT - keyboardHeight;
+        // Scrolle so, dass das Feld mit 120px Abstand vom oberen sichtbaren Bereich liegt
+        const scrollOffset = y - 120;
+        
+        scrollViewRef.current.scrollTo({
+          y: Math.max(0, scrollOffset),
+          animated: true,
+        });
+      }
+    }, 300);
+  };
+
+  const handleNoteInputLayout = (event: any) => {
+    const { y, height } = event.nativeEvent.layout;
+    noteInputLayoutRef.current = { y, height };
+  };
+
   return (
     <View style={[styles.overlayContainer, { zIndex }]}>
       <TouchableOpacity 
@@ -203,11 +231,18 @@ export default function CheckoutScreen({
             </View>
           </View>
           
-          <ScrollView 
-            style={styles.scrollView}
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={true}
+          <KeyboardAvoidingView 
+            style={styles.keyboardAvoidingView}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={0}
           >
+            <ScrollView 
+              ref={scrollViewRef}
+              style={styles.scrollView}
+              contentContainerStyle={styles.scrollContent}
+              showsVerticalScrollIndicator={true}
+              keyboardShouldPersistTaps="handled"
+            >
             {/* Lieferung/Abholung Auswahl */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Art der Bestellung</Text>
@@ -282,14 +317,19 @@ export default function CheckoutScreen({
             )}
 
             {/* Notiz an Lieferanten */}
-            <View style={styles.section}>
+            <View 
+              style={styles.section}
+              onLayout={handleNoteInputLayout}
+            >
               <Text style={styles.sectionTitle}>Notiz an Lieferanten</Text>
               <TextInput
+                ref={noteInputRef}
                 style={styles.noteInput}
                 placeholder="Optional: Hinweise für die Lieferung..."
                 placeholderTextColor="#999"
                 value={deliveryNote}
                 onChangeText={setDeliveryNote}
+                onFocus={handleNoteInputFocus}
                 multiline
                 numberOfLines={4}
               />
@@ -326,6 +366,7 @@ export default function CheckoutScreen({
               })}
             </View>
           </ScrollView>
+          </KeyboardAvoidingView>
 
           {/* Bestätigen Button */}
           <View style={styles.footer}>
@@ -477,6 +518,9 @@ const styles = StyleSheet.create({
   },
   headerSpacer: {
     width: 32,
+  },
+  keyboardAvoidingView: {
+    flex: 1,
   },
   scrollView: {
     flex: 1,

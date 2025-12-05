@@ -7270,9 +7270,9 @@
     "group": "Standardgruppe",
     "country": "Deutschland",
     "phone": "0931 649857",
-    "averageOrderValue": 117.0,
+    "averageOrderValue": 2200.0,
     "orderFrequency": "Zweiwöchentlich",
-    "revenueYTD": 41617,
+    "revenueYTD": 245000,
     "salesRep": null,
     "deliveryDays": [
       "Mo",
@@ -62843,9 +62843,9 @@
     "group": "Mach 1 Gruppe",
     "country": "Deutschland",
     "phone": "0932 383275",
-    "averageOrderValue": 159.92,
+    "averageOrderValue": 2450.0,
     "orderFrequency": "Zweiwöchentlich",
-    "revenueYTD": 37033,
+    "revenueYTD": 185000,
     "salesRep": null,
     "deliveryDays": [
       "Mo",
@@ -64222,5 +64222,34 @@
       "country": "Deutschland"
     },
     "email": "überstundenürnb@example.com"
+  },
+  {
+    "id": "2217",
+    "name": "Moggi",
+    "type": "restaurant",
+    "activityLevel": "aktiv",
+    "status": "Zuletzt bestellt vor 2 Tagen",
+    "group": "Standardgruppe",
+    "country": "Deutschland",
+    "phone": "0931 123456",
+    "averageOrderValue": 1850.0,
+    "orderFrequency": "Wöchentlich",
+    "revenueYTD": 68000.0,
+    "salesRep": null,
+    "deliveryDays": [
+      "Mo",
+      "Mi",
+      "Fr"
+    ],
+    "pricesVisible": true,
+    "minOrderQuantity": 100,
+    "notificationsEnabled": true,
+    "toAddress": {
+      "name": "Moggi",
+      "street": "Hauptstraße 42",
+      "city": "97070 Würzburg",
+      "country": "Deutschland"
+    },
+    "email": "moggi@example.com"
   }
 ]

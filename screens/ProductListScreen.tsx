@@ -10,6 +10,79 @@ import { categories } from '../data/categories';
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const searchInputRef = React.createRef<TextInput>();
 
+// Fuzzy Search Funktionen
+const levenshteinDistance = (str1: string, str2: string): number => {
+  const matrix: number[][] = [];
+  const len1 = str1.length;
+  const len2 = str2.length;
+
+  if (len1 === 0) return len2;
+  if (len2 === 0) return len1;
+
+  for (let i = 0; i <= len2; i++) {
+    matrix[i] = [i];
+  }
+
+  for (let j = 0; j <= len1; j++) {
+    matrix[0][j] = j;
+  }
+
+  for (let i = 1; i <= len2; i++) {
+    for (let j = 1; j <= len1; j++) {
+      if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j] + 1
+        );
+      }
+    }
+  }
+
+  return matrix[len2][len1];
+};
+
+const calculateSimilarity = (str1: string, str2: string): number => {
+  const longer = str1.length > str2.length ? str1 : str2;
+  const shorter = str1.length > str2.length ? str2 : str1;
+  
+  if (longer.length === 0) return 1.0;
+  
+  const distance = levenshteinDistance(longer.toLowerCase(), shorter.toLowerCase());
+  return (longer.length - distance) / longer.length;
+};
+
+// Prüft ob ein String ähnlich zu einem anderen ist (mit verschiedenen Methoden)
+const isSimilar = (query: string, productName: string, threshold: number = 0.6): boolean => {
+  const queryLower = query.toLowerCase().trim();
+  const productLower = productName.toLowerCase().trim();
+  
+  // Exakte Übereinstimmung oder Teilstring
+  if (productLower.includes(queryLower) || queryLower.includes(productLower)) {
+    return true;
+  }
+  
+  // Wörter aus Query und Produktname extrahieren
+  const queryWords = queryLower.split(/\s+/).filter(w => w.length > 2);
+  const productWords = productLower.split(/\s+/).filter(w => w.length > 2);
+  
+  // Prüfe ob mindestens ein Wort ähnlich ist
+  for (const queryWord of queryWords) {
+    for (const productWord of productWords) {
+      const similarity = calculateSimilarity(queryWord, productWord);
+      if (similarity >= threshold) {
+        return true;
+      }
+    }
+  }
+  
+  // Prüfe Gesamt-Ähnlichkeit
+  const overallSimilarity = calculateSimilarity(queryLower, productLower);
+  return overallSimilarity >= threshold;
+};
+
 interface ProductListScreenProps {
   category: Category;
   products: Product[];
@@ -231,13 +304,35 @@ export default function ProductListScreen({
     });
   }, [categoryFilteredProducts, selectedFilters]);
 
-  // Filtere zusätzlich nach Suchanfrage
+  // Filtere zusätzlich nach Suchanfrage mit Fuzzy Search
   const searchFilteredProducts = useMemo(() => {
-    if (!searchQuery) return filterCategoryFilteredProducts;
-    const lowerQuery = searchQuery.toLowerCase();
-    return filterCategoryFilteredProducts.filter(p => 
+    if (!searchQuery.trim()) return filterCategoryFilteredProducts;
+    
+    const query = searchQuery.trim();
+    const lowerQuery = query.toLowerCase();
+    
+    // Zuerst exakte Treffer suchen
+    const exactMatches = filterCategoryFilteredProducts.filter(p => 
       p.Artikelname?.toLowerCase().includes(lowerQuery)
     );
+    
+    // Wenn exakte Treffer gefunden wurden, diese zurückgeben
+    if (exactMatches.length > 0) {
+      return exactMatches;
+    }
+    
+    // Wenn keine exakten Treffer, Fuzzy Search verwenden
+    const fuzzyMatches = filterCategoryFilteredProducts
+      .map(p => ({
+        product: p,
+        similarity: p.Artikelname ? calculateSimilarity(lowerQuery, p.Artikelname.toLowerCase()) : 0,
+        isSimilar: p.Artikelname ? isSimilar(query, p.Artikelname, 0.5) : false
+      }))
+      .filter(item => item.isSimilar)
+      .sort((a, b) => b.similarity - a.similarity)
+      .map(item => item.product);
+    
+    return fuzzyMatches;
   }, [filterCategoryFilteredProducts, searchQuery]);
 
   // Sortiere Produkte: Favoriten zuerst (basierend auf snapshotFavoritesOrder beim Öffnen)

@@ -3,6 +3,7 @@ import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, TextInput, Scro
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import customersData from '../data/Kunden/customers.json';
+import ordersData from '../data/Bestellungen/orders.json';
 
 interface Customer {
   id: string;
@@ -55,12 +56,33 @@ export default function CustomerScreen({
   const [selectedArea, setSelectedArea] = useState<string | null>(null);
   const [selectedPrice, setSelectedPrice] = useState<string | null>(null);
   const [selectedCountry, setSelectedCountry] = useState<string>('');
+  const [showOver10Orders, setShowOver10Orders] = useState<boolean>(false);
   
   // Kombiniere CSV-Kunden mit neuen Kunden
   const allCustomers = useMemo(() => {
     const csvCustomers = (customersData as Customer[]);
     return [...newCustomers, ...csvCustomers];
   }, [newCustomers]);
+
+  // Berechne Bestellanzahl pro Kunde
+  const customerOrderCounts = useMemo(() => {
+    const counts: { [customerName: string]: number } = {};
+    const orders = ordersData as any[];
+    
+    orders.forEach(order => {
+      if (order.customer && !order.cancelled) {
+        const customerName = order.customer;
+        counts[customerName] = (counts[customerName] || 0) + 1;
+      }
+    });
+    
+    return counts;
+  }, []);
+
+  // Hilfsfunktion: Bestellanzahl für einen Kunden abrufen
+  const getOrderCount = (customerName: string): number => {
+    return customerOrderCounts[customerName] || 0;
+  };
 
   const toggleFilter = (filterSet: Set<string>, setFilterSet: (set: Set<string>) => void, value: string) => {
     const newSet = new Set(filterSet);
@@ -196,8 +218,40 @@ export default function CustomerScreen({
       );
     }
 
+    // Über 10 mal bestellt Filter
+    if (showOver10Orders) {
+      filtered = filtered.filter(customer => {
+        const orderCount = getOrderCount(customer.name);
+        return orderCount > 10;
+      });
+    }
+
+    // Sortiere: Nur spezifische Kunden (Moggi, mach1 Club GmbH, Babylon Kino am Stadtpark) mit über 10 Bestellungen zuerst
+    const allowedCustomersForLabel = ['Moggi', 'mach1 Club GmbH', 'Babylon Kino am Stadtpark'];
+    
+    filtered.sort((a, b) => {
+      const orderCountA = getOrderCount(a.name);
+      const orderCountB = getOrderCount(b.name);
+      const hasOver10A = orderCountA > 10 && allowedCustomersForLabel.includes(a.name);
+      const hasOver10B = orderCountB > 10 && allowedCustomersForLabel.includes(b.name);
+      
+      // Wenn beide über 10 Bestellungen haben und in der Whitelist sind, sortiere nach Anzahl (höchste zuerst)
+      if (hasOver10A && hasOver10B) {
+        return orderCountB - orderCountA;
+      }
+      
+      // Wenn nur A über 10 Bestellungen hat und in der Whitelist ist, kommt A zuerst
+      if (hasOver10A) return -1;
+      
+      // Wenn nur B über 10 Bestellungen hat und in der Whitelist ist, kommt B zuerst
+      if (hasOver10B) return 1;
+      
+      // Wenn keiner über 10 Bestellungen hat oder nicht in der Whitelist ist, behalte die ursprüngliche Reihenfolge
+      return 0;
+    });
+
     return filtered;
-  }, [searchQuery, selectedActivityLevels, selectedCustomerStatuses, selectedGroups, selectedCountry]);
+  }, [searchQuery, selectedActivityLevels, selectedCustomerStatuses, selectedGroups, selectedCountry, showOver10Orders, customerOrderCounts]);
 
   const getStatusLabelColor = (status: string) => {
     const statusLower = status.toLowerCase();
@@ -282,6 +336,12 @@ export default function CustomerScreen({
 
   const renderCustomer = ({ item: customer }: { item: Customer }) => {
     const statusColor = getStatusLabelColor(customer.status);
+    const orderCount = getOrderCount(customer.name);
+    const hasOver10Orders = orderCount > 10;
+    
+    // Whitelist: Nur diese Kunden sollen das Label "Über 10 mal bestellt" anzeigen
+    const allowedCustomersForLabel = ['Moggi', 'mach1 Club GmbH', 'Babylon Kino am Stadtpark'];
+    const shouldShowLabel = hasOver10Orders && allowedCustomersForLabel.includes(customer.name);
     
     return (
       <TouchableOpacity 
@@ -294,8 +354,16 @@ export default function CustomerScreen({
         </View>
         <View style={styles.customerInfo}>
           <Text style={styles.customerName}>{customer.name}</Text>
-          <View style={[styles.customerStatusLabel, { backgroundColor: statusColor }]}>
-            <Text style={styles.customerStatusText} numberOfLines={1}>{customer.status}</Text>
+          <View style={styles.labelsContainer}>
+            <View style={[styles.customerStatusLabel, { backgroundColor: statusColor }]}>
+              <Text style={styles.customerStatusText} numberOfLines={1}>{customer.status}</Text>
+            </View>
+            {shouldShowLabel && (
+              <View style={styles.over10OrdersLabel}>
+                <Ionicons name="trophy" size={14} color="#fff" />
+                <Text style={styles.over10OrdersText}>Über 10 mal bestellt</Text>
+              </View>
+            )}
           </View>
         </View>
       </TouchableOpacity>
@@ -665,6 +733,7 @@ export default function CustomerScreen({
                   setSelectedArea(null);
                   setSelectedPrice(null);
                   setSelectedCountry('');
+                  setShowOver10Orders(false);
                 }}
                 activeOpacity={0.7}
               >
@@ -815,11 +884,42 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     flexWrap: 'wrap',
   },
+  labelsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    alignItems: 'center',
+  },
   customerStatusLabel: {
     borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 4,
     alignSelf: 'flex-start',
+  },
+  over10OrdersLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#9C27B0',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    gap: 4,
+    shadowColor: '#9C27B0',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 4,
+    borderWidth: 1.5,
+    borderColor: '#7B1FA2',
+  },
+  over10OrdersText: {
+    fontSize: 12,
+    color: '#fff',
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   customerStatusText: {
     fontSize: 12,
@@ -899,6 +999,21 @@ const styles = StyleSheet.create({
   },
   filterChipClose: {
     marginLeft: 2,
+  },
+  over10OrdersFilterChip: {
+    backgroundColor: '#F3E5F5',
+    borderWidth: 1,
+    borderColor: '#9C27B0',
+  },
+  over10OrdersFilterLabel: {
+    backgroundColor: '#F3E5F5',
+    borderWidth: 1.5,
+    borderColor: '#9C27B0',
+  },
+  over10OrdersFilterLabelSelected: {
+    backgroundColor: '#E1BEE7',
+    borderWidth: 1.5,
+    borderColor: '#9C27B0',
   },
   modalOverlay: {
     position: 'absolute',

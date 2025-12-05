@@ -60,6 +60,7 @@ interface CustomerChatScreenProps {
   initialMessages?: ChatMessage[];
   onMessageSent?: (customerId: string, message: ChatMessage) => void;
   onChatOpened?: (customerId: string) => void;
+  onShowAllChats?: () => void;
 }
 
 export default function CustomerChatScreen({
@@ -68,7 +69,10 @@ export default function CustomerChatScreen({
   initialMessages,
   onMessageSent,
   onChatOpened,
+  onShowAllChats,
 }: CustomerChatScreenProps) {
+  // Debug: Prüfe ob onShowAllChats übergeben wird
+  console.log('CustomerChatScreen - onShowAllChats:', !!onShowAllChats);
   const [message, setMessage] = useState('');
   
   // Konvertiere initialMessages zu dem Format, das wir verwenden
@@ -279,7 +283,9 @@ export default function CustomerChatScreen({
               <TouchableOpacity onPress={closeOverlay} style={styles.backButton}>
                 <Ionicons name="chevron-back" size={24} color="#2E2C55" />
               </TouchableOpacity>
-              <Text style={styles.headerTitle}>{customer.name}</Text>
+              <View style={styles.headerTitleContainer}>
+                <Text style={styles.headerTitle}>{customer.name}</Text>
+              </View>
               <View style={styles.headerSpacer} />
             </View>
           </View>
@@ -419,19 +425,36 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    width: '100%',
   },
   backButton: {
     padding: 4,
+    width: 32,
+  },
+  headerTitleContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 8,
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#2E2C55',
-    flex: 1,
     textAlign: 'center',
   },
   headerSpacer: {
     width: 32,
+  },
+  chatsIconButton: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 8,
+    marginRight: 4,
+    backgroundColor: 'transparent',
+    zIndex: 10,
   },
   chatContainer: {
     flex: 1,

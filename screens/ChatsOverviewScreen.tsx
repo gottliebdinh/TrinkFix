@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, FlatList, TextInput, SafeAreaView } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, FlatList, TextInput, SafeAreaView, Modal } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import customersData from '../data/Kunden/customers.json';
@@ -39,76 +39,13 @@ interface ChatsOverviewScreenProps {
 
 // Generiere fiktive Chats basierend auf echten Kunden
 const generateFictionalChats = (): Chat[] => {
-  const customers = (customersData as any[]).slice(0, 50); // Erste 50 Kunden für mehr Chats
+  // Alle Kunden verwenden - sicherstellen dass es ein Array ist
+  const allCustomers = customersData as any[];
+  const customers = Array.isArray(allCustomers) ? allCustomers : [];
   const now = new Date();
   
-  const chatMessages: { [key: string]: string[] } = {
-    unread: [
-      "Hallo, wann können Sie uns beliefern?",
-      "Wir brauchen dringend Nachschub für das Wochenende",
-      "Können Sie die Bestellung für morgen bestätigen?",
-      "Gibt es aktuelle Angebote?",
-      "Wir haben eine Frage zu unserer letzten Bestellung",
-      "Können Sie uns heute noch liefern?",
-      "Wir benötigen dringend Bier für unsere Veranstaltung",
-      "Ist die Bestellung bereits unterwegs?",
-      "Können wir die Lieferzeit ändern?",
-      "Wir haben ein Problem mit der letzten Lieferung",
-      "Können Sie uns ein Angebot machen?",
-      "Wir möchten unsere Bestellung erweitern",
-      "Gibt es Rabatte bei größeren Mengen?",
-      "Können Sie uns kontaktieren?",
-      "Wir warten auf eine Rückmeldung",
-    ],
-    answered: [
-      "Vielen Dank für die schnelle Lieferung!",
-      "Die Qualität war wie immer ausgezeichnet",
-      "Können wir die nächste Bestellung für nächste Woche planen?",
-      "Alles gut angekommen, danke!",
-    ],
-    unanswered: [
-      "Hallo, können Sie mir bitte antworten?",
-      "Wir warten noch auf eine Rückmeldung",
-      "Ist unsere Bestellung bestätigt?",
-      "Können Sie uns bitte kontaktieren?",
-    ],
-  };
-  
-  return customers.map((customer, index) => {
-    // Erstelle mehr ungelesene Chats: Jeder 2. Chat ist ungelesen (für mehr ungelesene Chats)
-    const isUnread = index % 2 === 0; // Jeder 2. Chat ist ungelesen
-    const isUnanswered = index % 3 === 0 && !isUnread; // Jeder 3. Chat ist unbeantwortet (aber nicht ungelesen)
-    
-    let lastMessage = "";
-    let messageType: 'unread' | 'answered' | 'unanswered' = 'answered';
-    
-    if (isUnread) {
-      messageType = 'unread';
-      lastMessage = chatMessages.unread[index % chatMessages.unread.length];
-    } else if (isUnanswered) {
-      messageType = 'unanswered';
-      lastMessage = chatMessages.unanswered[index % chatMessages.unanswered.length];
-    } else {
-      lastMessage = chatMessages.answered[index % chatMessages.answered.length];
-    }
-    
-    // Zufällige Zeit in den letzten 7 Tagen
-    const daysAgo = Math.floor(Math.random() * 7);
-    const hoursAgo = Math.floor(Math.random() * 24);
-    const lastMessageTime = new Date(now);
-    lastMessageTime.setDate(lastMessageTime.getDate() - daysAgo);
-    lastMessageTime.setHours(lastMessageTime.getHours() - hoursAgo);
-    
-    // Generiere mehrere Nachrichten für den Chat
-    const messages: ChatMessage[] = [];
-    
-    // Trinkkartell-Nachricht (immer zuerst)
-    const trinkkartellMessageTime = new Date(lastMessageTime);
-    trinkkartellMessageTime.setDate(trinkkartellMessageTime.getDate() - 1);
-    messages.push({
-      id: 'trinkkartell-initial',
-      sender: 'user',
-      text: `Liebe Kundinnen und Kunden,
+  // Trinkkartell-Nachricht als Konstante
+  const TRINKKARTELL_MESSAGE = `Liebe Kundinnen und Kunden,
 
 wir haben unsere Liefertage neu aufgeteilt, um unsere Touren effizienter zu gestalten und euch noch besser und planbarer beliefern zu können. 🚛✨
 
@@ -141,12 +78,69 @@ Bei Fragen oder Unklarheiten sind wir wie immer gerne für euch da!
 Vielen Dank für euer Vertrauen & eure Unterstützung – wir freuen uns auf die weitere Zusammenarbeit! 💙
 
 Herzliche Grüße
-Euer Trinkkartell Team 🙌`,
-      timestamp: trinkkartellMessageTime,
-    });
+Euer Trinkkartell Team 🙌`;
+
+  const chatMessages: { [key: string]: string[] } = {
+    unread: [
+      "Hallo, wann können Sie uns beliefern?",
+      "Wir brauchen dringend Nachschub für das Wochenende",
+      "Können Sie die Bestellung für morgen bestätigen?",
+      "Gibt es aktuelle Angebote?",
+      "Wir haben eine Frage zu unserer letzten Bestellung",
+      "Können Sie uns heute noch liefern?",
+      "Wir benötigen dringend Bier für unsere Veranstaltung",
+      "Ist die Bestellung bereits unterwegs?",
+      "Können wir die Lieferzeit ändern?",
+      "Wir haben ein Problem mit der letzten Lieferung",
+      "Können Sie uns ein Angebot machen?",
+      "Wir möchten unsere Bestellung erweitern",
+      "Gibt es Rabatte bei größeren Mengen?",
+      "Können Sie uns kontaktieren?",
+      "Wir warten auf eine Rückmeldung",
+    ],
+    unanswered: [
+      "Hallo, können Sie mir bitte antworten?",
+      "Wir warten noch auf eine Rückmeldung",
+      "Ist unsere Bestellung bestätigt?",
+      "Können Sie uns bitte kontaktieren?",
+    ],
+  };
+  
+  return customers.map((customer, index) => {
+    // Nur etwa 50 Chats als ungelesen markieren
+    const isUnread = index < 50; // Nur die ersten 50 Chats sind ungelesen
+    const isUnanswered = index >= 50 && index < 100 && (index - 50) % 3 === 0; // Etwa 17 unbeantwortete Chats nach den ungelesenen
     
-    // Kunden-Nachricht(en)
+    let lastMessage = "";
+    let lastMessageTime: Date;
+    
+    // Generiere mehrere Nachrichten für den Chat
+    const messages: ChatMessage[] = [];
+    
+    // Trinkkartell-Nachricht (immer zuerst)
+    const trinkkartellMessageTime = new Date(now);
+    trinkkartellMessageTime.setDate(trinkkartellMessageTime.getDate() - 7); // 7 Tage in der Vergangenheit
+    
     if (isUnread || isUnanswered) {
+      // Für ungelesene/unbeantwortete Chats: Füge Kunden-Nachricht(en) hinzu
+      lastMessage = isUnread 
+        ? chatMessages.unread[index % chatMessages.unread.length]
+        : chatMessages.unanswered[index % chatMessages.unanswered.length];
+      
+      // Zufällige Zeit in den letzten 7 Tagen
+      const daysAgo = Math.floor(Math.random() * 7);
+      const hoursAgo = Math.floor(Math.random() * 24);
+      lastMessageTime = new Date(now);
+      lastMessageTime.setDate(lastMessageTime.getDate() - daysAgo);
+      lastMessageTime.setHours(lastMessageTime.getHours() - hoursAgo);
+      
+      messages.push({
+        id: 'trinkkartell-initial',
+        sender: 'user',
+        text: TRINKKARTELL_MESSAGE,
+        timestamp: trinkkartellMessageTime,
+      });
+      
       messages.push({
         id: 'customer-1',
         sender: 'customer',
@@ -166,20 +160,17 @@ Euer Trinkkartell Team 🙌`,
         });
       }
     } else {
-      // Für beantwortete Chats: Füge eine Antwort von Trinkkartell hinzu
-      const responseTime = new Date(lastMessageTime);
-      responseTime.setHours(responseTime.getHours() + 1);
+      // Für answered Chats: Nur die Trinkkartell-Nachricht
+      // Verwende die ersten Worte der Nachricht als Vorschau für die Chat-Liste
+      const firstLine = TRINKKARTELL_MESSAGE.split('\n')[0];
+      lastMessage = firstLine.length > 50 ? firstLine.substring(0, 47) + '...' : firstLine;
+      lastMessageTime = trinkkartellMessageTime;
+      
       messages.push({
-        id: 'customer-1',
-        sender: 'customer',
-        text: lastMessage,
-        timestamp: lastMessageTime,
-      });
-      messages.push({
-        id: 'trinkkartell-response',
+        id: 'trinkkartell-initial',
         sender: 'user',
-        text: 'Vielen Dank für Ihre Nachricht. Wir werden uns umgehend darum kümmern!',
-        timestamp: responseTime,
+        text: TRINKKARTELL_MESSAGE,
+        timestamp: trinkkartellMessageTime,
       });
     }
     
@@ -200,6 +191,33 @@ Euer Trinkkartell Team 🙌`,
   });
 };
 
+// Hilfsfunktion: Finde Nachrichten für einen bestimmten Kunden basierend auf ID oder Name
+export const getChatMessagesForCustomer = (customerId: string, customerName: string): ChatMessage[] => {
+  const chats = generateFictionalChats();
+  
+  // Versuche zuerst nach ID zu finden
+  let chat = chats.find(c => c.customer.id === customerId);
+  
+  // Falls nicht gefunden, versuche nach Name zu finden (normalisiert)
+  if (!chat) {
+    const normalizedName = customerName.toLowerCase().trim();
+    chat = chats.find(c => {
+      const chatName = c.customer.name.toLowerCase().trim();
+      return chatName === normalizedName || 
+             chatName.includes(normalizedName) || 
+             normalizedName.includes(chatName);
+    });
+  }
+  
+  // Wenn Chat gefunden, gib die Nachrichten zurück
+  if (chat) {
+    return chat.messages;
+  }
+  
+  // Falls kein Chat gefunden, gib leeres Array zurück (CustomerChatScreen zeigt dann die Trinkkartell-Nachricht)
+  return [];
+};
+
 export default function ChatsOverviewScreen({
   onBack,
   onChatPress,
@@ -209,7 +227,9 @@ export default function ChatsOverviewScreen({
   onChatRead,
 }: ChatsOverviewScreenProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'unread' | 'unanswered'>('unread');
+  const [activeTab, setActiveTab] = useState<'unread' | 'unanswered' | 'all'>('unread');
+  const [showNewChatModal, setShowNewChatModal] = useState(false);
+  const [newChatSearchQuery, setNewChatSearchQuery] = useState('');
   const [baseChats] = useState<Chat[]>(generateFictionalChats());
   
   // Merge gespeicherte Nachrichten mit den Basis-Chats
@@ -246,8 +266,8 @@ export default function ChatsOverviewScreen({
       
       return {
         ...chat,
-        unread: lastMessageFromCustomer && !isRead,
-        unanswered: lastMessageFromCustomer && isRead && isUnanswered,
+        unread: !!(lastMessageFromCustomer && !isRead),
+        unanswered: !!(lastMessageFromCustomer && isRead && isUnanswered),
       };
     });
   }, [baseChats, savedMessages, readChats, unansweredChats]);
@@ -255,7 +275,7 @@ export default function ChatsOverviewScreen({
   const filteredChats = useMemo(() => {
     let filtered = chats;
     
-    // Filter nach Tab
+    // Standard-Verhalten mit Tabs
     if (activeTab === 'unread') {
       filtered = filtered.filter(chat => chat.unread);
     } else if (activeTab === 'unanswered') {
@@ -276,6 +296,16 @@ export default function ChatsOverviewScreen({
       b.lastMessageTime.getTime() - a.lastMessageTime.getTime()
     );
   }, [chats, activeTab, searchQuery]);
+
+  // Kunden für neuen Chat filtern
+  const filteredCustomersForNewChat = useMemo(() => {
+    const query = newChatSearchQuery.toLowerCase().trim();
+    if (!query) return (customersData as Customer[]);
+    
+    return (customersData as Customer[]).filter(c => 
+      c.name.toLowerCase().includes(query)
+    );
+  }, [newChatSearchQuery]);
   
   const formatTime = (date: Date) => {
     const now = new Date();
@@ -363,39 +393,39 @@ export default function ChatsOverviewScreen({
         </View>
         
         <View style={styles.tabsContainer}>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'unread' && styles.tabActive]}
-            onPress={() => setActiveTab('unread')}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.tabText, activeTab === 'unread' && styles.tabTextActive]}>
-              Ungelesen
-            </Text>
-            {chats.filter(c => c.unread).length > 0 && (
-              <View style={styles.tabBadge}>
-                <Text style={styles.tabBadgeText}>
-                  {chats.filter(c => c.unread).length}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'unanswered' && styles.tabActive]}
-            onPress={() => setActiveTab('unanswered')}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.tabText, activeTab === 'unanswered' && styles.tabTextActive]}>
-              Unbeantwortet
-            </Text>
-            {chats.filter(c => c.unanswered).length > 0 && (
-              <View style={styles.tabBadge}>
-                <Text style={styles.tabBadgeText}>
-                  {chats.filter(c => c.unanswered).length}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'unread' && styles.tabActive]}
+              onPress={() => setActiveTab(activeTab === 'unread' ? 'all' : 'unread')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.tabText, activeTab === 'unread' && styles.tabTextActive]}>
+                Ungelesen
+              </Text>
+              {chats.filter(c => c.unread).length > 0 && (
+                <View style={styles.tabBadge}>
+                  <Text style={styles.tabBadgeText}>
+                    {chats.filter(c => c.unread).length}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'unanswered' && styles.tabActive]}
+              onPress={() => setActiveTab(activeTab === 'unanswered' ? 'all' : 'unanswered')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.tabText, activeTab === 'unanswered' && styles.tabTextActive]}>
+                Unbeantwortet
+              </Text>
+              {chats.filter(c => c.unanswered).length > 0 && (
+                <View style={styles.tabBadge}>
+                  <Text style={styles.tabBadgeText}>
+                    {chats.filter(c => c.unanswered).length}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
       </View>
       
       <FlatList
@@ -453,6 +483,12 @@ const styles = StyleSheet.create({
   },
   headerSpacer: {
     width: 32,
+  },
+  filterButton: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   searchContainer: {
     flexDirection: 'row',

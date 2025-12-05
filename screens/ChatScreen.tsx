@@ -209,13 +209,13 @@ export default function ChatScreen({
           </View>
           
           <View style={styles.chatContainer}>
-            <ScrollView 
+          <ScrollView 
               ref={scrollViewRef}
-              style={styles.scrollView}
-              contentContainerStyle={styles.scrollContent}
-              showsVerticalScrollIndicator={true}
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={true}
               keyboardShouldPersistTaps="handled"
-            >
+          >
               {messages.map((msg) => (
                 <View
                   key={msg.id}
@@ -282,7 +282,7 @@ export default function ChatScreen({
                 </TouchableOpacity>
               </View>
             </KeyboardAvoidingView>
-          </View>
+            </View>
         </View>
       </Animated.View>
     </View>

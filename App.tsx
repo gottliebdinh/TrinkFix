@@ -19,7 +19,7 @@ import CustomerDetailScreen from './screens/CustomerDetailScreen';
 import CustomerChatScreen from './screens/CustomerChatScreen';
 import AddCustomerScreen from './screens/AddCustomerScreen';
 import OrdersScreen from './screens/OrdersScreen';
-import ChatsOverviewScreen from './screens/ChatsOverviewScreen';
+import ChatsOverviewScreen, { getChatMessagesForCustomer } from './screens/ChatsOverviewScreen';
 
 // Generiere Dummy-Items für Bestellungen ohne Items
 const generateDummyItems = (count: number) => {
@@ -427,6 +427,20 @@ export default function App() {
             setShowOrdersScreen(true);
           }}
           onChatPress={(customer) => {
+            // Lade die Nachrichten aus den generierten Chats
+            const messages = getChatMessagesForCustomer(customer.id, customer.name);
+            
+            // Speichere die Nachrichten, falls noch nicht vorhanden
+            setChatMessages(prev => {
+              if (!prev[customer.id] || prev[customer.id].length === 0) {
+                return {
+                  ...prev,
+                  [customer.id]: messages,
+                };
+              }
+              return prev;
+            });
+            
             setShowCustomerChat(true);
           }}
           onOrderPress={(order) => {
